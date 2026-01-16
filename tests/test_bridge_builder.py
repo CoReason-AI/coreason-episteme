@@ -10,8 +10,16 @@
 
 from unittest.mock import MagicMock
 
+import networkx as nx
 import pytest
 
+from coreason_episteme.adapters.local_clients import (
+    LocalCodexClient,
+    LocalGraphNexusClient,
+    LocalPrismClient,
+    LocalSearchClient,
+    LocalVeritasClient,
+)
 from coreason_episteme.components.bridge_builder import BridgeBuilderImpl
 from coreason_episteme.models import (
     ConfidenceLevel,
@@ -216,3 +224,36 @@ def test_generate_hypothesis_insufficient_nodes(
     assert bridge_builder.generate_hypothesis(gap_one_node) is None
     assert bridge_builder.generate_hypothesis(gap_no_node) is None
     assert bridge_builder.generate_hypothesis(gap_none) is None
+
+
+def test_bridge_builder_with_local_clients() -> None:
+    """Test BridgeBuilder using purely Local clients to verify wiring."""
+    # Setup
+    g = nx.Graph()
+    # Source and Target
+    g.add_node("DiseaseX", type="disease")
+    g.add_node("GeneA", type="gene")
+    # Bridge
+    g.add_node("BridgeGene", is_bridge=True, ensembl_id="ENSG_BRIDGE", druggability=0.8)
+
+    graph_client = LocalGraphNexusClient(g)
+
+    # Needs to match what LocalGraphNexusClient.find_latent_bridges returns
+    prism_client = LocalPrismClient({"ENSG_BRIDGE": 0.8})
+    codex_client = LocalCodexClient()  # validates all
+    search_client = LocalSearchClient(
+        {"valid_claims": ["DiseaseX interacts with BridgeGene and BridgeGene affects GeneA"]}
+    )
+    veritas_client = LocalVeritasClient()
+
+    builder = BridgeBuilderImpl(graph_client, prism_client, codex_client, search_client, veritas_client)
+
+    gap = KnowledgeGap(description="Gap", source_nodes=["DiseaseX", "GeneA"])
+
+    # Execute
+    hypothesis = builder.generate_hypothesis(gap)
+
+    # Verify
+    assert hypothesis is not None
+    assert hypothesis.target_candidate.symbol == "BridgeGene"
+    assert len(veritas_client.logs) == 1

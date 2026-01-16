@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from coreason_episteme.adapters.local_clients import LocalInferenceClient
 from coreason_episteme.components.causal_validator import CausalValidatorImpl
 from coreason_episteme.models import (
     ConfidenceLevel,
@@ -71,3 +72,36 @@ def test_validate_success(
         mechanism="Mechanism A -> B -> C",
         intervention_target="GeneX",
     )
+
+
+def test_validate_with_local_client() -> None:
+    """Test using LocalInferenceClient."""
+    # Setup
+    target = GeneticTarget(
+        symbol="GeneX",
+        ensembl_id="ENSG000001",
+        druggability_score=0.9,
+        novelty_score=0.8,
+    )
+    hypothesis = Hypothesis(
+        id="hypo-123",
+        title="Test Hypothesis",
+        knowledge_gap="Gap Description",
+        proposed_mechanism="MechABC",
+        target_candidate=target,
+        causal_validation_score=0.0,
+        key_counterfactual="",
+        killer_experiment_pico={},
+        evidence_chain=[],
+        confidence=ConfidenceLevel.SPECULATIVE,
+    )
+
+    # Preload results
+    client = LocalInferenceClient({"GeneX->MechABC": 0.95})
+    validator = CausalValidatorImpl(client)
+
+    # Execute
+    validated = validator.validate(hypothesis)
+
+    # Verify
+    assert validated.causal_validation_score == 0.95
