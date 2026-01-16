@@ -7,3 +7,15 @@
 # Commercial use beyond a 30-day trial requires a separate license.
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
+
+from .bridge_builder import BridgeBuilderImpl
+from .causal_validator import CausalValidatorImpl
+from .gap_scanner import MockGapScanner
+from .protocol_designer import ProtocolDesignerImpl
+
+__all__ = [
+    "BridgeBuilderImpl",
+    "CausalValidatorImpl",
+    "MockGapScanner",
+    "ProtocolDesignerImpl",
+]
