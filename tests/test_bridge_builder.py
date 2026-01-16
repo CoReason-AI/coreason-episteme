@@ -226,6 +226,45 @@ def test_generate_hypothesis_insufficient_nodes(
     assert bridge_builder.generate_hypothesis(gap_none) is None
 
 
+def test_bridge_builder_directionality_swap(
+    bridge_builder: BridgeBuilderImpl,
+    mock_graph_client: MagicMock,
+    mock_prism_client: MagicMock,
+    mock_codex_client: MagicMock,
+    mock_search_client: MagicMock,
+) -> None:
+    """Test that BridgeBuilder correctly identifies the reverse direction."""
+    # Gap Source Nodes: [A, B]
+    gap = KnowledgeGap(description="Gap between A and B", source_nodes=["NodeA", "NodeB"])
+
+    bridge_target = GeneticTarget(
+        symbol="GeneSwapped",
+        ensembl_id="ENSG_SWAPPED",
+        druggability_score=0.9,
+        novelty_score=0.8,
+    )
+    mock_graph_client.find_latent_bridges.return_value = [bridge_target]
+    mock_prism_client.check_druggability.return_value = 0.9
+    mock_codex_client.validate_target.return_value = bridge_target.model_copy()
+
+    # Configure Search to fail A->Bridge->B but pass B->Bridge->A
+    def side_effect(claim: str) -> bool:
+        # Expected reverse claim: "NodeB interacts with GeneSwapped and GeneSwapped affects NodeA"
+        if "NodeB interacts with GeneSwapped" in claim and "affects NodeA" in claim:
+            return True
+        return False
+
+    mock_search_client.verify_citation.side_effect = side_effect
+
+    # Execute
+    hypothesis = bridge_builder.generate_hypothesis(gap)
+
+    # Verify
+    assert hypothesis is not None
+    assert "bridging from NodeB" in hypothesis.proposed_mechanism
+    assert "NodeB -> GeneSwapped -> NodeA" in hypothesis.title
+
+
 def test_bridge_builder_with_local_clients() -> None:
     """Test BridgeBuilder using purely Local clients to verify wiring."""
     # Setup

@@ -56,16 +56,20 @@ class BridgeBuilderImpl:
             logger.warning("Gap does not have enough source nodes to find bridges.")
             return None
 
-        source_id = gap.source_nodes[0]
-        target_id = gap.source_nodes[1]
+        # We start with the order provided, but we might swap them if the evidence flow suggests otherwise.
+        node_a = gap.source_nodes[0]
+        node_b = gap.source_nodes[1]
 
-        potential_bridges = self.graph_client.find_latent_bridges(source_id, target_id)
+        potential_bridges = self.graph_client.find_latent_bridges(node_a, node_b)
         if not potential_bridges:
             logger.info("No latent bridges found.")
             return None
 
         best_candidate = None
         best_druggability = -1.0
+        # Keep track of the resolved direction for the best candidate
+        # (source, target) tuple
+        best_direction = (node_a, node_b)
 
         for bridge in potential_bridges:
             # Check druggability
@@ -74,13 +78,27 @@ class BridgeBuilderImpl:
                 # Validate details with Codex
                 validated_target = self.codex_client.validate_target(bridge.symbol)
                 if validated_target:
-                    # Hallucination Check: Verify citation
-                    # We construct a claim to verify.
-                    interaction_claim = (
-                        f"{source_id} interacts with {validated_target.symbol} "
-                        f"and {validated_target.symbol} affects {target_id}"
+                    # Hallucination Check: Verify citation in both directions
+
+                    # Direction 1: A -> Bridge -> B
+                    claim_1 = (
+                        f"{node_a} interacts with {validated_target.symbol} "
+                        f"and {validated_target.symbol} affects {node_b}"
                     )
-                    is_verified = self.search_client.verify_citation(interaction_claim)
+                    is_verified = False
+
+                    if self.search_client.verify_citation(claim_1):
+                        is_verified = True
+                        current_direction = (node_a, node_b)
+                    else:
+                        # Direction 2: B -> Bridge -> A
+                        claim_2 = (
+                            f"{node_b} interacts with {validated_target.symbol} "
+                            f"and {validated_target.symbol} affects {node_a}"
+                        )
+                        if self.search_client.verify_citation(claim_2):
+                            is_verified = True
+                            current_direction = (node_b, node_a)
 
                     if is_verified:
                         # Update with fresh data from Codex (and keep the druggability score)
@@ -89,6 +107,7 @@ class BridgeBuilderImpl:
                         if druggability > best_druggability:
                             best_druggability = druggability
                             best_candidate = validated_target
+                            best_direction = current_direction
                     else:
                         logger.info(f"Discarding candidate {bridge.symbol} due to failed citation verification.")
 
@@ -96,13 +115,15 @@ class BridgeBuilderImpl:
             logger.info("No valid targets found among bridges (druggable & verified).")
             return None
 
+        final_source_id, final_target_id = best_direction
+
         # Construct Hypothesis
         hypothesis_id = str(uuid.uuid4())
-        mechanism = f"Regulation of {target_id} via {best_candidate.symbol} (bridging from {source_id})."
+        mechanism = f"Regulation of {final_target_id} via {best_candidate.symbol} (bridging from {final_source_id})."
 
         hypothesis = Hypothesis(
             id=hypothesis_id,
-            title=f"Proposed Link: {source_id} -> {best_candidate.symbol} -> {target_id}",
+            title=f"Proposed Link: {final_source_id} -> {best_candidate.symbol} -> {final_target_id}",
             knowledge_gap=gap.description,
             proposed_mechanism=mechanism,
             target_candidate=best_candidate,
