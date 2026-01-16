@@ -101,6 +101,21 @@ class BridgeBuilderImpl:
                             current_direction = (node_b, node_a)
 
                     if is_verified:
+                        # Strict Null Hypothesis: Check for disconfirming evidence
+                        # We construct the "claim" again to check for negation, or assume the client handles the query
+                        # "Search for papers that say Gene X is NOT involved in Disease Y"
+
+                        # We re-use the verified claim string for the negative check
+                        # (The client implementation decides how to interpret "checking negation" for this claim string)
+                        # Note: current_direction is set above when verified
+                        claim_to_check = claim_1 if current_direction == (node_a, node_b) else claim_2
+
+                        has_disconfirming = self.search_client.check_disconfirming_evidence(claim_to_check)
+
+                        if has_disconfirming:
+                            logger.info(f"Discarding candidate {bridge.symbol} due to disconfirming evidence.")
+                            continue
+
                         # Update with fresh data from Codex (and keep the druggability score)
                         validated_target.druggability_score = druggability
 

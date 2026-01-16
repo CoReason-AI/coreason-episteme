@@ -69,6 +69,13 @@ class SearchClient(Protocol):
         """Verifies if a claimed interaction is supported by literature."""
         ...
 
+    def check_disconfirming_evidence(self, interaction_claim: str) -> bool:
+        """
+        Checks for evidence that explicitly contradicts the claim.
+        Returns True if disconfirming evidence is found (i.e., hypothesis is blocked).
+        """
+        ...
+
 
 class VeritasClient(Protocol):
     """Interface for coreason-veritas (The Log)."""

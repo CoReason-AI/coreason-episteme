@@ -105,6 +105,15 @@ class LocalSearchClient(SearchClient):
         valid_claims = self.data.get("valid_claims", [])
         return interaction_claim in valid_claims
 
+    def check_disconfirming_evidence(self, interaction_claim: str) -> bool:
+        """
+        Checks for evidence that explicitly contradicts the claim.
+        Returns True if disconfirming evidence is found.
+        """
+        # Look for the claim in a 'disproven_claims' list
+        disproven_claims = self.data.get("disproven_claims", [])
+        return interaction_claim in disproven_claims
+
 
 class LocalCodexClient(CodexClient):
     """Local implementation of CodexClient."""

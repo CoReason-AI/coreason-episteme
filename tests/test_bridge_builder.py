@@ -46,7 +46,12 @@ def mock_codex_client() -> MagicMock:
 
 @pytest.fixture  # type: ignore[misc]
 def mock_search_client() -> MagicMock:
-    return MagicMock()
+    m = MagicMock()
+    # Default to False for boolean checks (no verification, no disconfirmation)
+    # Individual tests should override verification to True as needed
+    m.verify_citation.return_value = False
+    m.check_disconfirming_evidence.return_value = False
+    return m
 
 
 @pytest.fixture  # type: ignore[misc]
@@ -263,6 +268,36 @@ def test_bridge_builder_directionality_swap(
     assert hypothesis is not None
     assert "bridging from NodeB" in hypothesis.proposed_mechanism
     assert "NodeB -> GeneSwapped -> NodeA" in hypothesis.title
+
+
+def test_bridge_builder_disconfirming_evidence(
+    bridge_builder: BridgeBuilderImpl,
+    mock_graph_client: MagicMock,
+    mock_prism_client: MagicMock,
+    mock_codex_client: MagicMock,
+    mock_search_client: MagicMock,
+) -> None:
+    """Test that a hypothesis is discarded if disconfirming evidence is found."""
+    gap = KnowledgeGap(description="Gap", source_nodes=["A", "B"])
+    bridge_target = GeneticTarget(symbol="X", ensembl_id="ENS", druggability_score=0.9, novelty_score=0.9)
+
+    mock_graph_client.find_latent_bridges.return_value = [bridge_target]
+    mock_prism_client.check_druggability.return_value = 0.9
+    mock_codex_client.validate_target.return_value = bridge_target.model_copy()
+
+    # Positive verification passes
+    mock_search_client.verify_citation.return_value = True
+
+    # Negative check finds evidence ("Yes, there is evidence refuting this")
+    mock_search_client.check_disconfirming_evidence.return_value = True
+
+    # Execute
+    hypothesis = bridge_builder.generate_hypothesis(gap)
+
+    # Verify
+    assert hypothesis is None
+    # Ensure check was called
+    mock_search_client.check_disconfirming_evidence.assert_called()
 
 
 def test_bridge_builder_with_local_clients() -> None:

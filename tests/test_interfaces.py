@@ -58,6 +58,9 @@ class MockSearchClient:
     def verify_citation(self, interaction_claim: str) -> bool:
         return True
 
+    def check_disconfirming_evidence(self, interaction_claim: str) -> bool:
+        return False
+
 
 class MockVeritasClient:
     def log_trace(self, hypothesis_id: str, trace_data: Dict[str, Any]) -> None:
