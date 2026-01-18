@@ -18,7 +18,12 @@ from coreason_episteme.interfaces import (
     SearchClient,
     VeritasClient,
 )
-from coreason_episteme.models import ConfidenceLevel, Hypothesis, KnowledgeGap
+from coreason_episteme.models import (
+    PICO,
+    ConfidenceLevel,
+    Hypothesis,
+    KnowledgeGap,
+)
 from coreason_episteme.utils.logger import logger
 
 
@@ -108,7 +113,7 @@ class BridgeBuilderImpl:
             target_candidate=best_candidate,
             causal_validation_score=0.0,
             key_counterfactual="",
-            killer_experiment_pico={},
+            killer_experiment_pico=PICO(population="TBD", intervention="TBD", comparator="TBD", outcome="TBD"),
             evidence_chain=gap.source_nodes + [best_candidate.ensembl_id],
             confidence=ConfidenceLevel.SPECULATIVE,
         )

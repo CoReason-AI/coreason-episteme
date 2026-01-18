@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -18,6 +18,18 @@ class ConfidenceLevel(str, Enum):
     SPECULATIVE = "SPECULATIVE"
     PLAUSIBLE = "PLAUSIBLE"
     PROBABLE = "PROBABLE"
+
+
+class KnowledgeGapType(str, Enum):
+    CLUSTER_DISCONNECT = "CLUSTER_DISCONNECT"
+    LITERATURE_INCONSISTENCY = "LITERATURE_INCONSISTENCY"
+
+
+class PICO(BaseModel):
+    population: str
+    intervention: str
+    comparator: str
+    outcome: str
 
 
 class GeneticTarget(BaseModel):
@@ -29,6 +41,7 @@ class GeneticTarget(BaseModel):
 
 class KnowledgeGap(BaseModel):
     description: str
+    type: KnowledgeGapType
     source_nodes: Optional[List[str]] = None
 
 
@@ -44,7 +57,7 @@ class Hypothesis(BaseModel):
     key_counterfactual: str
 
     # Experimental Design
-    killer_experiment_pico: Dict[str, Any]
+    killer_experiment_pico: PICO
 
     # Provenance
     evidence_chain: List[str]  # Links to source papers/nodes
