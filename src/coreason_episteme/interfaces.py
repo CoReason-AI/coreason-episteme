@@ -37,6 +37,20 @@ class InferenceClient(Protocol):
         """
         ...
 
+    def run_toxicology_screen(self, target_candidate: GeneticTarget) -> List[str]:
+        """
+        Runs a toxicology screen on the target.
+        Returns a list of potential toxicity risks.
+        """
+        ...
+
+    def check_clinical_redundancy(self, mechanism: str, target_candidate: GeneticTarget) -> List[str]:
+        """
+        Checks if the proposed mechanism/target is redundant with existing clinical interventions.
+        Returns a list of redundancy warnings.
+        """
+        ...
+
 
 class CodexClient(Protocol):
     """Interface for coreason-codex (The Dictionary)."""
@@ -67,6 +81,13 @@ class SearchClient(Protocol):
 
     def verify_citation(self, interaction_claim: str) -> bool:
         """Verifies if a claimed interaction is supported by literature."""
+        ...
+
+    def check_patent_infringement(self, target_candidate: GeneticTarget, mechanism: str) -> List[str]:
+        """
+        Checks for potential patent infringement.
+        Returns a list of relevant patents or conflicts.
+        """
         ...
 
 
@@ -123,5 +144,16 @@ class ProtocolDesigner(Protocol):
         """
         Designs the killer experiment for the hypothesis.
         Updates the hypothesis with PICO details.
+        """
+        ...
+
+
+class AdversarialReviewer(Protocol):
+    """Interface for the Adversarial Reviewer (The Council)."""
+
+    def review(self, hypothesis: Hypothesis) -> Hypothesis:
+        """
+        Conducts an adversarial review of the hypothesis.
+        Updates the hypothesis with critiques from Toxicology, Clinical, and IP perspectives.
         """
         ...

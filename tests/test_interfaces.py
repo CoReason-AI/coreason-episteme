@@ -37,6 +37,12 @@ class MockInferenceClient:
     def run_counterfactual_simulation(self, mechanism: str, intervention_target: str) -> float:
         return 0.5
 
+    def run_toxicology_screen(self, target_candidate: GeneticTarget) -> List[str]:
+        return []
+
+    def check_clinical_redundancy(self, mechanism: str, target_candidate: GeneticTarget) -> List[str]:
+        return []
+
 
 class MockCodexClient:
     def get_semantic_similarity(self, entity1: str, entity2: str) -> float:
@@ -57,6 +63,9 @@ class MockSearchClient:
 
     def verify_citation(self, interaction_claim: str) -> bool:
         return True
+
+    def check_patent_infringement(self, target_candidate: GeneticTarget, mechanism: str) -> List[str]:
+        return []
 
 
 class MockVeritasClient:

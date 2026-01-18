@@ -11,7 +11,7 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ConfidenceLevel(str, Enum):
@@ -62,3 +62,6 @@ class Hypothesis(BaseModel):
     # Provenance
     evidence_chain: List[str]  # Links to source papers/nodes
     confidence: ConfidenceLevel
+
+    # Adversarial Review
+    critiques: List[str] = Field(default_factory=list)
