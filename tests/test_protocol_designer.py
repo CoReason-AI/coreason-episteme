@@ -11,7 +11,7 @@
 import pytest
 
 from coreason_episteme.components.protocol_designer import ProtocolDesignerImpl
-from coreason_episteme.models import ConfidenceLevel, GeneticTarget, Hypothesis
+from coreason_episteme.models import PICO, ConfidenceLevel, GeneticTarget, Hypothesis
 
 
 @pytest.fixture  # type: ignore[misc]
@@ -35,7 +35,7 @@ def sample_hypothesis() -> Hypothesis:
         target_candidate=target,
         causal_validation_score=0.8,
         key_counterfactual="Counterfactual Z",
-        killer_experiment_pico={},
+        killer_experiment_pico=PICO(population="", intervention="", comparator="", outcome=""),
         evidence_chain=[],
         confidence=ConfidenceLevel.PLAUSIBLE,
     )
@@ -49,16 +49,17 @@ def test_design_experiment_populates_pico(
 
     assert result.killer_experiment_pico is not None
     pico = result.killer_experiment_pico
-    assert "population" in pico
-    assert "intervention" in pico
-    assert "comparator" in pico
-    assert "outcome" in pico
-    assert "duration" in pico
 
-    assert "Mechanism Y" in pico["population"]
-    assert "TargetX" in pico["intervention"]
-    assert "Vehicle control" in pico["comparator"]
-    assert "Mechanism Y" in pico["outcome"]
+    # Assert fields are populated (not empty strings)
+    assert pico.population
+    assert pico.intervention
+    assert pico.comparator
+    assert pico.outcome
+
+    assert "Mechanism Y" in pico.population
+    assert "TargetX" in pico.intervention
+    assert "Vehicle control" in pico.comparator
+    assert "Mechanism Y" in pico.outcome
 
 
 def test_design_experiment_returns_hypothesis(
