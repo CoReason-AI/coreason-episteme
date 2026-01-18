@@ -202,3 +202,98 @@ def test_scan_malformed_cluster_data(
     # Verify
     assert len(gaps) == 0
     mock_codex_client.get_semantic_similarity.assert_not_called()
+
+
+def test_scan_boundary_condition(
+    gap_scanner_impl: GapScannerImpl,
+    mock_graph_client: MagicMock,
+    mock_codex_client: MagicMock,
+    mock_search_client: MagicMock,
+) -> None:
+    """Test boundary condition where similarity is exactly 0.75."""
+    mock_graph_client.find_disconnected_clusters.return_value = [{"cluster_a_id": "A", "cluster_b_id": "B"}]
+    mock_codex_client.get_semantic_similarity.return_value = 0.75
+    mock_search_client.find_literature_inconsistency.return_value = []
+
+    gaps = gap_scanner_impl.scan("TargetX")
+
+    assert len(gaps) == 1
+    assert gaps[0].type == KnowledgeGapType.CLUSTER_DISCONNECT
+
+
+def test_scan_robustness_malformed_data(
+    gap_scanner_impl: GapScannerImpl,
+    mock_graph_client: MagicMock,
+    mock_codex_client: MagicMock,
+    mock_search_client: MagicMock,
+) -> None:
+    """Test robustness against malformed data (None, empty strings)."""
+    mock_graph_client.find_disconnected_clusters.return_value = [
+        {"cluster_a_id": None, "cluster_b_id": "B"},
+        {"cluster_a_id": "A", "cluster_b_id": None},
+        {"cluster_a_id": "", "cluster_b_id": "B"},  # Empty string treated as falsey
+        {"cluster_a_id": "A", "cluster_b_id": ""},
+    ]
+    mock_search_client.find_literature_inconsistency.return_value = []
+
+    gaps = gap_scanner_impl.scan("TargetX")
+
+    assert len(gaps) == 0
+    mock_codex_client.get_semantic_similarity.assert_not_called()
+
+
+def test_scan_complex_scenario(
+    gap_scanner_impl: GapScannerImpl,
+    mock_graph_client: MagicMock,
+    mock_codex_client: MagicMock,
+    mock_search_client: MagicMock,
+) -> None:
+    """Test a complex scenario with mixed valid/invalid clusters and search results."""
+    mock_graph_client.find_disconnected_clusters.return_value = [
+        {"cluster_a_id": "A1", "cluster_b_id": "B1"},  # Valid (Sim 0.8)
+        {"cluster_a_id": "A2", "cluster_b_id": "B2"},  # Invalid (Sim 0.4)
+        {"cluster_a_id": "A3"},  # Malformed
+    ]
+
+    def similarity_side_effect(a: str, b: str) -> float:
+        if a == "A1" and b == "B1":
+            return 0.8
+        if a == "A2" and b == "B2":
+            return 0.4
+        return 0.0
+
+    mock_codex_client.get_semantic_similarity.side_effect = similarity_side_effect
+
+    mock_search_client.find_literature_inconsistency.return_value = [
+        KnowledgeGap(description="Lit Gap", type=KnowledgeGapType.LITERATURE_INCONSISTENCY, source_nodes=["PMID:1"])
+    ]
+
+    gaps = gap_scanner_impl.scan("TargetX")
+
+    assert len(gaps) == 2
+    assert any(g.type == KnowledgeGapType.CLUSTER_DISCONNECT for g in gaps)
+    assert any(g.type == KnowledgeGapType.LITERATURE_INCONSISTENCY for g in gaps)
+
+
+def test_scan_duplicate_symmetry(
+    gap_scanner_impl: GapScannerImpl,
+    mock_graph_client: MagicMock,
+    mock_codex_client: MagicMock,
+    mock_search_client: MagicMock,
+) -> None:
+    """
+    Test behavior when symmetric pairs (A-B and B-A) are returned.
+    Current behavior: Both are reported.
+    """
+    mock_graph_client.find_disconnected_clusters.return_value = [
+        {"cluster_a_id": "A", "cluster_b_id": "B", "cluster_a_name": "Cluster A", "cluster_b_name": "Cluster B"},
+        {"cluster_a_id": "B", "cluster_b_id": "A", "cluster_a_name": "Cluster B", "cluster_b_name": "Cluster A"},
+    ]
+    mock_codex_client.get_semantic_similarity.return_value = 0.9
+    mock_search_client.find_literature_inconsistency.return_value = []
+
+    gaps = gap_scanner_impl.scan("TargetX")
+
+    assert len(gaps) == 2
+    assert gaps[0].source_nodes == ["A", "B"]
+    assert gaps[1].source_nodes == ["B", "A"]
