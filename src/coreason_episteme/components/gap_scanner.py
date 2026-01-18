@@ -10,35 +10,69 @@
 
 from typing import List
 
+from coreason_episteme.interfaces import CodexClient, GraphNexusClient, SearchClient
 from coreason_episteme.models import KnowledgeGap, KnowledgeGapType
 from coreason_episteme.utils.logger import logger
 
 
-class MockGapScanner:
-    """A mock implementation of the GapScanner for testing and development."""
+class GapScannerImpl:
+    """Implementation of the GapScanner (The Void Detector)."""
+
+    def __init__(
+        self,
+        graph_client: GraphNexusClient,
+        codex_client: CodexClient,
+        search_client: SearchClient,
+    ):
+        self.graph_client = graph_client
+        self.codex_client = codex_client
+        self.search_client = search_client
 
     def scan(self, target: str) -> List[KnowledgeGap]:
         """
-        Simulates scanning for knowledge gaps.
+        Scans for knowledge gaps (Negative Space Analysis).
 
-        Args:
-            target: The disease or entity ID.
-
-        Returns:
-            A list containing a mock KnowledgeGap, or empty list if target is 'CleanTarget'.
+        1. Cluster Analysis: Finds disconnected subgraphs with high semantic similarity (>= 0.75).
+        2. Literature Discrepancy: Finds inconsistencies via Search.
         """
-        logger.info(f"Scanning for gaps related to {target} (MOCK)")
+        logger.info(f"Scanning for knowledge gaps related to {target}...")
+        gaps: List[KnowledgeGap] = []
 
-        if target == "CleanTarget":
-            logger.info("No gaps found.")
-            return []
+        # 1. Cluster Analysis
+        logger.debug(f"Querying GraphNexus for disconnected clusters for {target}...")
+        raw_clusters = self.graph_client.find_disconnected_clusters({"target": target})
+        logger.debug(f"Found {len(raw_clusters)} potential disconnected cluster pairs.")
 
-        # Return a simulated gap
-        gap = KnowledgeGap(
-            description=(
-                f"Simulated gap: Unexplained inhibition of {target} pathway despite high expression of Regulator X."
-            ),
-            type=KnowledgeGapType.CLUSTER_DISCONNECT,
-            source_nodes=["PMID:123456", "PMID:789012"],
-        )
-        return [gap]
+        for pair in raw_clusters:
+            cluster_a_id = pair.get("cluster_a_id")
+            cluster_b_id = pair.get("cluster_b_id")
+            cluster_a_name = pair.get("cluster_a_name", "Unknown")
+            cluster_b_name = pair.get("cluster_b_name", "Unknown")
+
+            if cluster_a_id and cluster_b_id:
+                similarity = self.codex_client.get_semantic_similarity(cluster_a_id, cluster_b_id)
+                if similarity >= 0.75:
+                    logger.info(
+                        f"Found disconnect with high similarity ({similarity}): {cluster_a_name} <-> {cluster_b_name}"
+                    )
+                    description = (
+                        f"Cluster Disconnect: {cluster_a_name} and {cluster_b_name} "
+                        f"are similar ({similarity}) but unconnected."
+                    )
+                    gaps.append(
+                        KnowledgeGap(
+                            description=description,
+                            type=KnowledgeGapType.CLUSTER_DISCONNECT,
+                            source_nodes=[cluster_a_id, cluster_b_id],
+                        )
+                    )
+
+        # 2. Literature Discrepancy
+        logger.debug(f"Searching for literature inconsistencies for {target}...")
+        lit_gaps = self.search_client.find_literature_inconsistency(target)
+        if lit_gaps:
+            logger.info(f"Found {len(lit_gaps)} literature inconsistencies.")
+            gaps.extend(lit_gaps)
+
+        logger.info(f"Total gaps found for {target}: {len(gaps)}")
+        return gaps
