@@ -18,6 +18,7 @@ from coreason_episteme.models import (
     GeneticTarget,
     Hypothesis,
     KnowledgeGap,
+    KnowledgeGapType,
 )
 
 
@@ -73,7 +74,11 @@ def test_generate_hypothesis_success(
 ) -> None:
     """Test successful hypothesis generation with verification and logging."""
     # Setup inputs
-    gap = KnowledgeGap(description="Gap between A and B", source_nodes=["NodeA", "NodeB"])
+    gap = KnowledgeGap(
+        description="Gap between A and B",
+        source_nodes=["NodeA", "NodeB"],
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
 
     # Setup mock returns
     bridge_target = GeneticTarget(
@@ -125,7 +130,11 @@ def test_generate_hypothesis_citation_verification_fail(
     mock_veritas_client: MagicMock,
 ) -> None:
     """Test when citation verification fails."""
-    gap = KnowledgeGap(description="Gap between A and B", source_nodes=["NodeA", "NodeB"])
+    gap = KnowledgeGap(
+        description="Gap between A and B",
+        source_nodes=["NodeA", "NodeB"],
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
 
     bridge_target = GeneticTarget(
         symbol="GeneX",
@@ -151,7 +160,11 @@ def test_generate_hypothesis_citation_verification_fail(
 
 def test_generate_hypothesis_no_bridges(bridge_builder: BridgeBuilderImpl, mock_graph_client: MagicMock) -> None:
     """Test when no latent bridges are found."""
-    gap = KnowledgeGap(description="Gap between A and B", source_nodes=["NodeA", "NodeB"])
+    gap = KnowledgeGap(
+        description="Gap between A and B",
+        source_nodes=["NodeA", "NodeB"],
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
     mock_graph_client.find_latent_bridges.return_value = []
 
     hypothesis = bridge_builder.generate_hypothesis(gap)
@@ -165,7 +178,11 @@ def test_generate_hypothesis_no_druggable_bridges(
     mock_prism_client: MagicMock,
 ) -> None:
     """Test when bridges exist but are not druggable."""
-    gap = KnowledgeGap(description="Gap between A and B", source_nodes=["NodeA", "NodeB"])
+    gap = KnowledgeGap(
+        description="Gap between A and B",
+        source_nodes=["NodeA", "NodeB"],
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
 
     bridge_target = GeneticTarget(
         symbol="GeneY",
@@ -188,7 +205,11 @@ def test_generate_hypothesis_codex_validation_fail(
     mock_codex_client: MagicMock,
 ) -> None:
     """Test when Codex fails to validate the target."""
-    gap = KnowledgeGap(description="Gap between A and B", source_nodes=["NodeA", "NodeB"])
+    gap = KnowledgeGap(
+        description="Gap between A and B",
+        source_nodes=["NodeA", "NodeB"],
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
 
     bridge_target = GeneticTarget(
         symbol="GeneZ",
@@ -209,9 +230,21 @@ def test_generate_hypothesis_insufficient_nodes(
     bridge_builder: BridgeBuilderImpl,
 ) -> None:
     """Test when gap has fewer than 2 source nodes."""
-    gap_one_node = KnowledgeGap(description="Gap with one node", source_nodes=["NodeA"])
-    gap_no_node = KnowledgeGap(description="Gap with no nodes", source_nodes=[])
-    gap_none = KnowledgeGap(description="Gap with None nodes", source_nodes=None)
+    gap_one_node = KnowledgeGap(
+        description="Gap with one node",
+        source_nodes=["NodeA"],
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
+    gap_no_node = KnowledgeGap(
+        description="Gap with no nodes",
+        source_nodes=[],
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
+    gap_none = KnowledgeGap(
+        description="Gap with None nodes",
+        source_nodes=None,
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
 
     assert bridge_builder.generate_hypothesis(gap_one_node) is None
     assert bridge_builder.generate_hypothesis(gap_no_node) is None

@@ -14,6 +14,7 @@ import pytest
 
 from coreason_episteme.components.causal_validator import CausalValidatorImpl
 from coreason_episteme.models import (
+    PICO,
     ConfidenceLevel,
     GeneticTarget,
     Hypothesis,
@@ -50,7 +51,7 @@ def test_validate_success(
         target_candidate=target,
         causal_validation_score=0.0,
         key_counterfactual="",
-        killer_experiment_pico={},
+        killer_experiment_pico=PICO(population="", intervention="", comparator="", outcome=""),
         evidence_chain=[],
         confidence=ConfidenceLevel.SPECULATIVE,
     )

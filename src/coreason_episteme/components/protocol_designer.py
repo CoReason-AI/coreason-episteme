@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from coreason_episteme.models import Hypothesis
+from coreason_episteme.models import PICO, Hypothesis
 from coreason_episteme.utils.logger import logger
 
 
@@ -38,13 +38,12 @@ class ProtocolDesignerImpl:
         # Outcome: Validating the mechanism
         outcome = f"Modulation of downstream biomarkers associated with {mechanism}"
 
-        pico = {
-            "population": population,
-            "intervention": intervention,
-            "comparator": comparator,
-            "outcome": outcome,
-            "duration": "72h (In vitro) / 14 days (In vivo)",  # Default heuristic
-        }
+        pico = PICO(
+            population=population,
+            intervention=intervention,
+            comparator=comparator,
+            outcome=outcome,
+        )
 
         hypothesis.killer_experiment_pico = pico
         logger.info(f"Experiment designed: {pico}")

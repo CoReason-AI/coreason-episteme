@@ -10,7 +10,7 @@
 
 from typing import List
 
-from coreason_episteme.models import KnowledgeGap
+from coreason_episteme.models import KnowledgeGap, KnowledgeGapType
 from coreason_episteme.utils.logger import logger
 
 
@@ -38,6 +38,7 @@ class MockGapScanner:
             description=(
                 f"Simulated gap: Unexplained inhibition of {target} pathway despite high expression of Regulator X."
             ),
+            type=KnowledgeGapType.CLUSTER_DISCONNECT,
             source_nodes=["PMID:123456", "PMID:789012"],
         )
         return [gap]
