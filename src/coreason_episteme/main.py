@@ -105,6 +105,7 @@ def generate_hypothesis(
         causal_validator=causal_validator,
         adversarial_reviewer=adversarial_reviewer,
         protocol_designer=protocol_designer,
+        veritas_client=veritas_client,  # type: ignore[arg-type]
     )
 
     # Run

@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
 import uuid
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from coreason_episteme.models import (
     PICO,
@@ -124,3 +124,14 @@ class MockProtocolDesigner:
             outcome="Survival",
         )
         return hypothesis
+
+
+class MockVeritasClient:
+    """Mock Veritas Client for capturing traces."""
+
+    def __init__(self) -> None:
+        self.traces: List[Dict[str, Any]] = []
+
+    def log_trace(self, hypothesis_id: str, trace_data: Dict[str, Any]) -> None:
+        self.traces.append({"id": hypothesis_id, "data": trace_data})
+        logger.info(f"MockVeritasClient logged trace for {hypothesis_id}: {trace_data.keys()}")

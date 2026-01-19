@@ -20,6 +20,7 @@ from tests.mocks import (
     MockCausalValidator,
     MockGapScanner,
     MockProtocolDesigner,
+    MockVeritasClient,
 )
 
 
@@ -31,6 +32,7 @@ def engine() -> EpistemeEngine:
         causal_validator=MockCausalValidator(),
         adversarial_reviewer=MockAdversarialReviewer(),
         protocol_designer=MockProtocolDesigner(),
+        veritas_client=MockVeritasClient(),
     )
 
 
@@ -76,6 +78,7 @@ def test_engine_run_low_causal_score(engine: EpistemeEngine) -> None:
         causal_validator=MockCausalValidator(),
         adversarial_reviewer=MockAdversarialReviewer(),
         protocol_designer=MockProtocolDesigner(),
+        veritas_client=MockVeritasClient(),
     )
 
     results = bad_engine.run("TargetX")
@@ -114,6 +117,7 @@ def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
         causal_validator=MockCausalValidator(),
         adversarial_reviewer=MockAdversarialReviewer(),
         protocol_designer=MockProtocolDesigner(),
+        veritas_client=MockVeritasClient(),
     )
 
     results = refinement_engine.run("TargetX")
@@ -143,6 +147,7 @@ def test_engine_run_bridge_failure(engine: EpistemeEngine) -> None:
         causal_validator=MockCausalValidator(),
         adversarial_reviewer=MockAdversarialReviewer(),
         protocol_designer=MockProtocolDesigner(),
+        veritas_client=MockVeritasClient(),
     )
 
     results = broken_engine.run("TargetX")
