@@ -8,9 +8,17 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from typing import List
+import uuid
+from typing import List, Optional
 
-from coreason_episteme.models import KnowledgeGap, KnowledgeGapType
+from coreason_episteme.models import (
+    PICO,
+    ConfidenceLevel,
+    GeneticTarget,
+    Hypothesis,
+    KnowledgeGap,
+    KnowledgeGapType,
+)
 from coreason_episteme.utils.logger import logger
 
 
@@ -42,3 +50,53 @@ class MockGapScanner:
             source_nodes=["PMID:123456", "PMID:789012"],
         )
         return [gap]
+
+
+class MockBridgeBuilder:
+    def generate_hypothesis(self, gap: KnowledgeGap) -> Optional[Hypothesis]:
+        if "Unbridgeable" in gap.description:
+            return None
+
+        return Hypothesis(
+            id=str(uuid.uuid4()),
+            title="Mock Hypothesis",
+            knowledge_gap=gap.description,
+            proposed_mechanism="Mock Mechanism",
+            target_candidate=GeneticTarget(
+                symbol="MOCK1", ensembl_id="ENSG000001", druggability_score=0.9, novelty_score=0.8
+            ),
+            causal_validation_score=0.0,
+            key_counterfactual="",
+            killer_experiment_pico=PICO(population="", intervention="", comparator="", outcome=""),
+            evidence_chain=[],
+            confidence=ConfidenceLevel.SPECULATIVE,
+        )
+
+
+class MockCausalValidator:
+    def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+        # Simulate validation score
+        if "BadTarget" in hypothesis.target_candidate.symbol:
+            hypothesis.causal_validation_score = 0.1
+        else:
+            hypothesis.causal_validation_score = 0.85
+            hypothesis.key_counterfactual = "If Mock1 is inhibited, disease Y is reduced."
+        return hypothesis
+
+
+class MockAdversarialReviewer:
+    def review(self, hypothesis: Hypothesis) -> Hypothesis:
+        if "Risky" in hypothesis.target_candidate.symbol:
+            hypothesis.critiques.append("Toxicology risk detected.")
+        return hypothesis
+
+
+class MockProtocolDesigner:
+    def design_experiment(self, hypothesis: Hypothesis) -> Hypothesis:
+        hypothesis.killer_experiment_pico = PICO(
+            population="Mice",
+            intervention="Drug X",
+            comparator="Placebo",
+            outcome="Survival",
+        )
+        return hypothesis
