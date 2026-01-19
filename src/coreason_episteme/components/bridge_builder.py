@@ -16,10 +16,10 @@ from coreason_episteme.interfaces import (
     GraphNexusClient,
     PrismClient,
     SearchClient,
-    VeritasClient,
 )
 from coreason_episteme.models import (
     PICO,
+    BridgeResult,
     ConfidenceLevel,
     Hypothesis,
     KnowledgeGap,
@@ -36,17 +36,13 @@ class BridgeBuilderImpl:
         prism_client: PrismClient,
         codex_client: CodexClient,
         search_client: SearchClient,
-        veritas_client: VeritasClient,
     ):
         self.graph_client = graph_client
         self.prism_client = prism_client
         self.codex_client = codex_client
         self.search_client = search_client
-        self.veritas_client = veritas_client
 
-    def generate_hypothesis(
-        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
-    ) -> Optional[Hypothesis]:
+    def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
         """
         Generates a hypothesis bridging the knowledge gap.
 
@@ -55,24 +51,31 @@ class BridgeBuilderImpl:
         3. Filters bridges for druggability via Prism.
         4. Validates target via Codex.
         5. Verifies citations via Search (Hallucination Check).
-        6. Logs trace via Veritas.
-        7. Constructs a Hypothesis.
+        6. Constructs a Hypothesis and returns BridgeResult.
         """
         logger.info(f"Attempting to build bridge for gap: {gap.description}")
         if excluded_targets:
             logger.info(f"Excluding targets: {excluded_targets}")
 
+        # Default result (failure)
+        result_metadata = {"bridges_found_count": 0, "considered_candidates": []}
+
         if not gap.source_nodes or len(gap.source_nodes) < 2:
             logger.warning("Gap does not have enough source nodes to find bridges.")
-            return None
+            return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
         source_id = gap.source_nodes[0]
         target_id = gap.source_nodes[1]
 
         potential_bridges = self.graph_client.find_latent_bridges(source_id, target_id)
+
+        # Populate metadata
+        result_metadata["bridges_found_count"] = len(potential_bridges)
+        result_metadata["considered_candidates"] = [b.symbol for b in potential_bridges]
+
         if not potential_bridges:
             logger.info("No latent bridges found.")
-            return None
+            return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
         best_candidate = None
         best_druggability = -1.0
@@ -109,7 +112,11 @@ class BridgeBuilderImpl:
 
         if not best_candidate:
             logger.info("No valid targets found among bridges (druggable & verified).")
-            return None
+            return BridgeResult(
+                hypothesis=None,
+                bridges_found_count=result_metadata["bridges_found_count"],
+                considered_candidates=result_metadata["considered_candidates"],
+            )
 
         # Construct Hypothesis
         hypothesis_id = str(uuid.uuid4())
@@ -128,16 +135,9 @@ class BridgeBuilderImpl:
             confidence=ConfidenceLevel.SPECULATIVE,
         )
 
-        # Log trace
-        trace_data = {
-            "gap": gap.description,
-            "source_nodes": gap.source_nodes,
-            "bridges_found": len(potential_bridges),
-            "selected_target": best_candidate.symbol,
-            "mechanism": mechanism,
-            "excluded_targets": excluded_targets if excluded_targets else [],
-        }
-        self.veritas_client.log_trace(hypothesis_id, trace_data)
-
         logger.info(f"Generated hypothesis: {hypothesis.id}")
-        return hypothesis
+        return BridgeResult(
+            hypothesis=hypothesis,
+            bridges_found_count=result_metadata["bridges_found_count"],
+            considered_candidates=result_metadata["considered_candidates"],
+        )

@@ -10,7 +10,7 @@
 
 from typing import Any, Dict, List, Optional, Protocol
 
-from coreason_episteme.models import GeneticTarget, Hypothesis, KnowledgeGap
+from coreason_episteme.models import BridgeResult, GeneticTarget, Hypothesis, KnowledgeGap
 
 # --- External Service Interfaces ---
 
@@ -129,15 +129,16 @@ class GapScanner(Protocol):
 class BridgeBuilder(Protocol):
     """Interface for the Bridge Builder (Hypothesis Formulator)."""
 
-    def generate_hypothesis(
-        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
-    ) -> Optional[Hypothesis]:
+    def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
         """
         Generates a hypothesis bridging the knowledge gap.
 
         Args:
             gap: The KnowledgeGap to bridge.
             excluded_targets: Optional list of target symbols to exclude from consideration.
+
+        Returns:
+            A BridgeResult containing the hypothesis (if found) and metadata.
         """
         ...
 

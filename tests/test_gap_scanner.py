@@ -11,10 +11,10 @@
 from unittest.mock import MagicMock
 
 import pytest
-
 from coreason_episteme.components.gap_scanner import GapScannerImpl
 from coreason_episteme.interfaces import GapScanner
 from coreason_episteme.models import KnowledgeGap, KnowledgeGapType
+
 from tests.mocks import MockGapScanner
 
 

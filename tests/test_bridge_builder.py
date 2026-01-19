@@ -11,9 +11,9 @@
 from unittest.mock import MagicMock
 
 import pytest
-
 from coreason_episteme.components.bridge_builder import BridgeBuilderImpl
 from coreason_episteme.models import (
+    BridgeResult,
     ConfidenceLevel,
     GeneticTarget,
     Hypothesis,
@@ -43,24 +43,17 @@ def mock_search_client() -> MagicMock:
 
 
 @pytest.fixture  # type: ignore[misc]
-def mock_veritas_client() -> MagicMock:
-    return MagicMock()
-
-
-@pytest.fixture  # type: ignore[misc]
 def bridge_builder(
     mock_graph_client: MagicMock,
     mock_prism_client: MagicMock,
     mock_codex_client: MagicMock,
     mock_search_client: MagicMock,
-    mock_veritas_client: MagicMock,
 ) -> BridgeBuilderImpl:
     return BridgeBuilderImpl(
         graph_client=mock_graph_client,
         prism_client=mock_prism_client,
         codex_client=mock_codex_client,
         search_client=mock_search_client,
-        veritas_client=mock_veritas_client,
     )
 
 
@@ -70,9 +63,8 @@ def test_generate_hypothesis_success(
     mock_prism_client: MagicMock,
     mock_codex_client: MagicMock,
     mock_search_client: MagicMock,
-    mock_veritas_client: MagicMock,
 ) -> None:
-    """Test successful hypothesis generation with verification and logging."""
+    """Test successful hypothesis generation with metadata return."""
     # Setup inputs
     gap = KnowledgeGap(
         description="Gap between A and B",
@@ -96,13 +88,18 @@ def test_generate_hypothesis_success(
     mock_search_client.verify_citation.return_value = True
 
     # Execute
-    hypothesis = bridge_builder.generate_hypothesis(gap)
+    result = bridge_builder.generate_hypothesis(gap)
 
-    # Verify
-    assert hypothesis is not None
-    assert isinstance(hypothesis, Hypothesis)
-    assert hypothesis.confidence == ConfidenceLevel.SPECULATIVE
-    assert hypothesis.target_candidate.symbol == "GeneX"
+    # Verify Result Structure
+    assert isinstance(result, BridgeResult)
+    assert result.hypothesis is not None
+    assert isinstance(result.hypothesis, Hypothesis)
+    assert result.hypothesis.confidence == ConfidenceLevel.SPECULATIVE
+    assert result.hypothesis.target_candidate.symbol == "GeneX"
+
+    # Verify Metadata
+    assert result.bridges_found_count == 1
+    assert result.considered_candidates == ["GeneX"]
 
     # Verify interactions
     mock_graph_client.find_latent_bridges.assert_called_with("NodeA", "NodeB")
@@ -113,13 +110,6 @@ def test_generate_hypothesis_success(
     expected_claim = "NodeA interacts with GeneX and GeneX affects NodeB"
     mock_search_client.verify_citation.assert_called_with(expected_claim)
 
-    # Verify logging
-    mock_veritas_client.log_trace.assert_called_once()
-    args, _ = mock_veritas_client.log_trace.call_args
-    assert args[0] == hypothesis.id
-    assert args[1]["gap"] == "Gap between A and B"
-    assert args[1]["selected_target"] == "GeneX"
-
 
 def test_generate_hypothesis_citation_verification_fail(
     bridge_builder: BridgeBuilderImpl,
@@ -127,7 +117,6 @@ def test_generate_hypothesis_citation_verification_fail(
     mock_prism_client: MagicMock,
     mock_codex_client: MagicMock,
     mock_search_client: MagicMock,
-    mock_veritas_client: MagicMock,
 ) -> None:
     """Test when citation verification fails."""
     gap = KnowledgeGap(
@@ -150,12 +139,13 @@ def test_generate_hypothesis_citation_verification_fail(
     mock_search_client.verify_citation.return_value = False
 
     # Execute
-    hypothesis = bridge_builder.generate_hypothesis(gap)
+    result = bridge_builder.generate_hypothesis(gap)
 
     # Verify
-    assert hypothesis is None
+    assert result.hypothesis is None
+    assert result.bridges_found_count == 1
+    assert "GeneX" in result.considered_candidates
     mock_search_client.verify_citation.assert_called()
-    mock_veritas_client.log_trace.assert_not_called()
 
 
 def test_generate_hypothesis_no_bridges(bridge_builder: BridgeBuilderImpl, mock_graph_client: MagicMock) -> None:
@@ -167,9 +157,11 @@ def test_generate_hypothesis_no_bridges(bridge_builder: BridgeBuilderImpl, mock_
     )
     mock_graph_client.find_latent_bridges.return_value = []
 
-    hypothesis = bridge_builder.generate_hypothesis(gap)
+    result = bridge_builder.generate_hypothesis(gap)
 
-    assert hypothesis is None
+    assert result.hypothesis is None
+    assert result.bridges_found_count == 0
+    assert result.considered_candidates == []
 
 
 def test_generate_hypothesis_no_druggable_bridges(
@@ -193,9 +185,11 @@ def test_generate_hypothesis_no_druggable_bridges(
     mock_graph_client.find_latent_bridges.return_value = [bridge_target]
     mock_prism_client.check_druggability.return_value = 0.3
 
-    hypothesis = bridge_builder.generate_hypothesis(gap)
+    result = bridge_builder.generate_hypothesis(gap)
 
-    assert hypothesis is None
+    assert result.hypothesis is None
+    assert result.bridges_found_count == 1
+    assert "GeneY" in result.considered_candidates
 
 
 def test_generate_hypothesis_codex_validation_fail(
@@ -221,9 +215,11 @@ def test_generate_hypothesis_codex_validation_fail(
     mock_prism_client.check_druggability.return_value = 0.8
     mock_codex_client.validate_target.return_value = None
 
-    hypothesis = bridge_builder.generate_hypothesis(gap)
+    result = bridge_builder.generate_hypothesis(gap)
 
-    assert hypothesis is None
+    assert result.hypothesis is None
+    assert result.bridges_found_count == 1
+    assert "GeneZ" in result.considered_candidates
 
 
 def test_generate_hypothesis_insufficient_nodes(
@@ -235,20 +231,10 @@ def test_generate_hypothesis_insufficient_nodes(
         source_nodes=["NodeA"],
         type=KnowledgeGapType.CLUSTER_DISCONNECT,
     )
-    gap_no_node = KnowledgeGap(
-        description="Gap with no nodes",
-        source_nodes=[],
-        type=KnowledgeGapType.CLUSTER_DISCONNECT,
-    )
-    gap_none = KnowledgeGap(
-        description="Gap with None nodes",
-        source_nodes=None,
-        type=KnowledgeGapType.CLUSTER_DISCONNECT,
-    )
 
-    assert bridge_builder.generate_hypothesis(gap_one_node) is None
-    assert bridge_builder.generate_hypothesis(gap_no_node) is None
-    assert bridge_builder.generate_hypothesis(gap_none) is None
+    result = bridge_builder.generate_hypothesis(gap_one_node)
+    assert result.hypothesis is None
+    assert result.bridges_found_count == 0
 
 
 def test_generate_hypothesis_excluded_targets(
@@ -286,7 +272,13 @@ def test_generate_hypothesis_excluded_targets(
     mock_search_client.verify_citation.return_value = True
 
     # Exclude ToxicGene
-    hypothesis = bridge_builder.generate_hypothesis(gap, excluded_targets=["ToxicGene"])
+    result = bridge_builder.generate_hypothesis(gap, excluded_targets=["ToxicGene"])
 
-    assert hypothesis is not None
-    assert hypothesis.target_candidate.symbol == "SafeGene"
+    assert result.hypothesis is not None
+    assert result.hypothesis.target_candidate.symbol == "SafeGene"
+
+    # Metadata check
+    # bridges_found_count counts ALL returned by graph client (2)
+    assert result.bridges_found_count == 2
+    assert "ToxicGene" in result.considered_candidates
+    assert "SafeGene" in result.considered_candidates

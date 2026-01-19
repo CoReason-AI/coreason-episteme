@@ -11,8 +11,6 @@
 import json
 
 import pytest
-from pydantic import ValidationError
-
 from coreason_episteme.models import (
     PICO,
     ConfidenceLevel,
@@ -21,6 +19,7 @@ from coreason_episteme.models import (
     KnowledgeGap,
     KnowledgeGapType,
 )
+from pydantic import ValidationError
 
 
 def test_pico_model_valid() -> None:

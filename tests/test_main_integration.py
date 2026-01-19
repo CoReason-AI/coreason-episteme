@@ -11,7 +11,6 @@
 from typing import Any, Dict, List, Optional
 
 import pytest
-
 from coreason_episteme.main import generate_hypothesis
 from coreason_episteme.models import GeneticTarget, KnowledgeGap
 

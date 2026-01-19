@@ -9,7 +9,6 @@
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
 import pytest
-
 from coreason_episteme.components.protocol_designer import ProtocolDesignerImpl
 from coreason_episteme.models import PICO, ConfidenceLevel, GeneticTarget, Hypothesis
 

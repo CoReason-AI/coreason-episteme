@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from coreason_episteme.models import (
     PICO,
+    BridgeResult,
     ConfidenceLevel,
     Critique,
     CritiqueSeverity,
@@ -55,16 +56,14 @@ class MockGapScanner:
 
 
 class MockBridgeBuilder:
-    def generate_hypothesis(
-        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
-    ) -> Optional[Hypothesis]:
+    def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
         if "Unbridgeable" in gap.description:
-            return None
+            return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
         # Basic filtering simulation for mocks
         if excluded_targets and "MOCK1" in excluded_targets:
             # Return a backup if MOCK1 is excluded
-            return Hypothesis(
+            hyp = Hypothesis(
                 id=str(uuid.uuid4()),
                 title="Mock Hypothesis Backup",
                 knowledge_gap=gap.description,
@@ -78,8 +77,9 @@ class MockBridgeBuilder:
                 evidence_chain=[],
                 confidence=ConfidenceLevel.SPECULATIVE,
             )
+            return BridgeResult(hypothesis=hyp, bridges_found_count=2, considered_candidates=["MOCK1", "MOCK2"])
 
-        return Hypothesis(
+        hyp = Hypothesis(
             id=str(uuid.uuid4()),
             title="Mock Hypothesis",
             knowledge_gap=gap.description,
@@ -93,6 +93,7 @@ class MockBridgeBuilder:
             evidence_chain=[],
             confidence=ConfidenceLevel.SPECULATIVE,
         )
+        return BridgeResult(hypothesis=hyp, bridges_found_count=2, considered_candidates=["MOCK1", "MOCK2"])
 
 
 class MockCausalValidator:

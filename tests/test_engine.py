@@ -11,9 +11,9 @@
 from typing import List, Optional
 
 import pytest
-
 from coreason_episteme.engine import EpistemeEngine
-from coreason_episteme.models import Hypothesis, KnowledgeGap
+from coreason_episteme.models import BridgeResult, KnowledgeGap
+
 from tests.mocks import (
     MockAdversarialReviewer,
     MockBridgeBuilder,
@@ -53,6 +53,13 @@ def test_engine_run_happy_path(engine: EpistemeEngine) -> None:
     # Adversarial review check (no critiques for "TargetX")
     assert len(hypothesis.critiques) == 0
 
+    # Verify Trace Logging
+    veritas = engine.veritas_client  # type: ignore
+    assert len(veritas.traces) == 1
+    trace = veritas.traces[0]["data"]
+    assert trace["status"] == "ACCEPTED"
+    assert trace["bridges_found_count"] == 2
+
 
 def test_engine_run_no_gaps(engine: EpistemeEngine) -> None:
     """Test engine when no gaps are found."""
@@ -64,13 +71,11 @@ def test_engine_run_low_causal_score(engine: EpistemeEngine) -> None:
     """Test that hypotheses with low causal scores are filtered out."""
 
     class BadTargetBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
-        ) -> Optional[Hypothesis]:
-            h = super().generate_hypothesis(gap)
-            if h:
-                h.target_candidate.symbol = "BadTarget"
-            return h
+        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+            result = super().generate_hypothesis(gap, excluded_targets)
+            if result.hypothesis:
+                result.hypothesis.target_candidate.symbol = "BadTarget"
+            return result
 
     bad_engine = EpistemeEngine(
         gap_scanner=MockGapScanner(),
@@ -85,6 +90,11 @@ def test_engine_run_low_causal_score(engine: EpistemeEngine) -> None:
     # Should be filtered out because score will be 0.1 < 0.5
     assert len(results) == 0
 
+    # Verify Trace Logs "DISCARDED"
+    veritas = bad_engine.veritas_client  # type: ignore
+    assert len(veritas.traces) == 1
+    assert veritas.traces[0]["data"]["status"] == "DISCARDED (Low Causal Score)"
+
 
 def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
     """
@@ -95,21 +105,19 @@ def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
     """
 
     class RefinementBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
-        ) -> Optional[Hypothesis]:
+        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+            result = super().generate_hypothesis(gap, excluded_targets)
+
             # If RiskyTarget is NOT excluded, return it first
             if not excluded_targets or "RiskyTarget" not in excluded_targets:
-                h = super().generate_hypothesis(gap)
-                if h:
-                    h.target_candidate.symbol = "RiskyTarget"
-                return h
+                if result.hypothesis:
+                    result.hypothesis.target_candidate.symbol = "RiskyTarget"
+                return result
 
             # If RiskyTarget IS excluded, return SafeTarget
-            h = super().generate_hypothesis(gap)
-            if h:
-                h.target_candidate.symbol = "SafeTarget"
-            return h
+            if result.hypothesis:
+                result.hypothesis.target_candidate.symbol = "SafeTarget"
+            return result
 
     refinement_engine = EpistemeEngine(
         gap_scanner=MockGapScanner(),
@@ -131,15 +139,21 @@ def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
     # SafeTarget shouldn't have FATAL critiques
     assert len(hypothesis.critiques) == 0
 
+    # Verify Trace shows retries
+    veritas = refinement_engine.veritas_client  # type: ignore
+    assert len(veritas.traces) == 1
+    trace = veritas.traces[0]["data"]
+    assert trace["status"] == "ACCEPTED"
+    assert "RiskyTarget" in trace["excluded_targets_history"]
+    assert trace["refinement_retries"] > 0
+
 
 def test_engine_run_bridge_failure(engine: EpistemeEngine) -> None:
     """Test engine when bridge builder fails to generate a hypothesis."""
 
     class BrokenBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
-        ) -> Optional[Hypothesis]:
-            return None
+        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+            return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
     broken_engine = EpistemeEngine(
         gap_scanner=MockGapScanner(),
@@ -152,3 +166,8 @@ def test_engine_run_bridge_failure(engine: EpistemeEngine) -> None:
 
     results = broken_engine.run("TargetX")
     assert len(results) == 0
+
+    # Verify Trace
+    veritas = broken_engine.veritas_client  # type: ignore
+    assert len(veritas.traces) == 1
+    assert veritas.traces[0]["data"]["status"] == "DISCARDED (No Bridge)"
