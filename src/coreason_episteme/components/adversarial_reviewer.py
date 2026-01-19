@@ -64,6 +64,29 @@ class AdversarialReviewerImpl:
             critiques.extend(formatted_patents)
             logger.info(f"Patent conflicts found: {len(patents)}")
 
+        # 4. The Scientific Skeptic (Strict Null Hypothesis)
+        logger.debug("Searching for Disconfirming Evidence (Null Hypothesis Check)...")
+        # Attempt to parse subject/object from hypothesis or use best-effort mapping
+        # Subject: Intervention Target
+        # Object: Disease/Outcome (from knowledge gap or mechanism context)
+        # Action: "regulate" or "affect"
+        subject = hypothesis.target_candidate.symbol
+        # We try to extract the object from the mechanism or gap description.
+        # For robustness, we'll use the mechanism summary as the context.
+        object_context = hypothesis.knowledge_gap
+        action = "affect"
+
+        disconfirming_evidence = self.search_client.find_disconfirming_evidence(
+            subject=subject, object=object_context, action=action
+        )
+
+        if disconfirming_evidence:
+            formatted_skepticism = [
+                f"[Scientific Skeptic] Disconfirming evidence found: {evidence}" for evidence in disconfirming_evidence
+            ]
+            critiques.extend(formatted_skepticism)
+            logger.info(f"Disconfirming evidence found: {len(disconfirming_evidence)}")
+
         # Append to hypothesis
         hypothesis.critiques.extend(critiques)
 

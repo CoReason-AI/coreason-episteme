@@ -90,6 +90,14 @@ class SearchClient(Protocol):
         """
         ...
 
+    def find_disconfirming_evidence(self, subject: str, object: str, action: str) -> List[str]:
+        """
+        Searches for evidence that contradicts the proposed relationship.
+        e.g., "Gene X does NOT regulate Pathway Y".
+        Returns a list of citations or snippets supporting the null hypothesis.
+        """
+        ...
+
 
 class VeritasClient(Protocol):
     """Interface for coreason-veritas (The Log)."""
