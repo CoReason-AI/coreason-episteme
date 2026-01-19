@@ -78,6 +78,7 @@ def test_review_clean_pass(
     mock_inference_client.run_toxicology_screen.return_value = []
     mock_inference_client.check_clinical_redundancy.return_value = []
     mock_search_client.check_patent_infringement.return_value = []
+    mock_search_client.find_disconfirming_evidence.return_value = []
 
     # Execute
     reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
@@ -87,6 +88,7 @@ def test_review_clean_pass(
     mock_inference_client.run_toxicology_screen.assert_called_once_with(sample_hypothesis.target_candidate)
     mock_inference_client.check_clinical_redundancy.assert_called_once()
     mock_search_client.check_patent_infringement.assert_called_once()
+    mock_search_client.find_disconfirming_evidence.assert_called_once()
 
 
 def test_review_toxicology_fail(
@@ -100,6 +102,7 @@ def test_review_toxicology_fail(
     mock_inference_client.run_toxicology_screen.return_value = ["Liver Toxicity Risk"]
     mock_inference_client.check_clinical_redundancy.return_value = []
     mock_search_client.check_patent_infringement.return_value = []
+    mock_search_client.find_disconfirming_evidence.return_value = []
 
     # Execute
     reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
@@ -107,6 +110,35 @@ def test_review_toxicology_fail(
     # Verify
     assert len(reviewed_hypothesis.critiques) == 1
     assert "[Toxicologist] Liver Toxicity Risk" in reviewed_hypothesis.critiques[0]
+
+
+def test_review_skeptic_fail(
+    adversarial_reviewer: AdversarialReviewerImpl,
+    mock_inference_client: MagicMock,
+    mock_search_client: MagicMock,
+    sample_hypothesis: Hypothesis,
+) -> None:
+    """Test a review where the Scientific Skeptic finds disconfirming evidence."""
+    # Setup mocks
+    mock_inference_client.run_toxicology_screen.return_value = []
+    mock_inference_client.check_clinical_redundancy.return_value = []
+    mock_search_client.check_patent_infringement.return_value = []
+    mock_search_client.find_disconfirming_evidence.return_value = [
+        "Paper X (2020) explicitly states GeneA has no effect on Pathway Y."
+    ]
+
+    # Execute
+    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+
+    # Verify
+    assert len(reviewed_hypothesis.critiques) == 1
+    assert "[Scientific Skeptic]" in reviewed_hypothesis.critiques[0]
+    assert "Paper X (2020)" in reviewed_hypothesis.critiques[0]
+
+    # Check arguments
+    mock_search_client.find_disconfirming_evidence.assert_called_once_with(
+        subject="GeneA", object="Gap", action="affect"
+    )
 
 
 def test_review_multiple_critiques(
@@ -120,13 +152,15 @@ def test_review_multiple_critiques(
     mock_inference_client.run_toxicology_screen.return_value = ["Cardio Risk"]
     mock_inference_client.check_clinical_redundancy.return_value = ["Similar drug in Phase 2"]
     mock_search_client.check_patent_infringement.return_value = ["US Patent 12345"]
+    mock_search_client.find_disconfirming_evidence.return_value = ["Contradictory Study Z"]
 
     # Execute
     reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
 
     # Verify
-    assert len(reviewed_hypothesis.critiques) == 3
+    assert len(reviewed_hypothesis.critiques) == 4
     critique_texts = " ".join(reviewed_hypothesis.critiques)
     assert "[Toxicologist]" in critique_texts
     assert "[Clinician]" in critique_texts
     assert "[IP Strategist]" in critique_texts
+    assert "[Scientific Skeptic]" in critique_texts

@@ -44,6 +44,9 @@ class StubSearchClient:
     def check_patent_infringement(self, target_candidate: GeneticTarget, mechanism: str) -> List[str]:
         return []
 
+    def find_disconfirming_evidence(self, subject: str, object: str, action: str) -> List[str]:
+        return []
+
 
 class StubPrismClient:
     def check_druggability(self, target_id: str) -> float:
