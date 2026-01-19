@@ -16,6 +16,7 @@ import pytest
 from coreason_episteme.engine import EpistemeEngine
 from coreason_episteme.models import (
     PICO,
+    BridgeResult,
     ConfidenceLevel,
     Critique,
     CritiqueSeverity,
@@ -52,12 +53,10 @@ def test_refinement_max_retries_exceeded() -> None:
     """
 
     class InfiniteToxicBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
-        ) -> Optional[Hypothesis]:
+        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
             # Always return a new Toxic target
             unique_id = uuid.uuid4().hex[:6]
-            return Hypothesis(
+            hyp = Hypothesis(
                 id=str(uuid.uuid4()),
                 title="Toxic Hypothesis",
                 knowledge_gap=gap.description,
@@ -73,6 +72,9 @@ def test_refinement_max_retries_exceeded() -> None:
                 killer_experiment_pico=PICO(population="", intervention="", comparator="", outcome=""),
                 evidence_chain=[],
                 confidence=ConfidenceLevel.SPECULATIVE,
+            )
+            return BridgeResult(
+                hypothesis=hyp, bridges_found_count=1, considered_candidates=[hyp.target_candidate.symbol]
             )
 
     engine = EpistemeEngine(
@@ -95,15 +97,13 @@ def test_refinement_candidate_exhaustion() -> None:
     """
 
     class ExhaustibleBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
-        ) -> Optional[Hypothesis]:
+        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
             # If any target is excluded, assume we ran out of options
             if excluded_targets:
-                return None
+                return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
             # Return one toxic target initially
-            return Hypothesis(
+            hyp = Hypothesis(
                 id=str(uuid.uuid4()),
                 title="Toxic Hypothesis",
                 knowledge_gap=gap.description,
@@ -119,6 +119,9 @@ def test_refinement_candidate_exhaustion() -> None:
                 killer_experiment_pico=PICO(population="", intervention="", comparator="", outcome=""),
                 evidence_chain=[],
                 confidence=ConfidenceLevel.SPECULATIVE,
+            )
+            return BridgeResult(
+                hypothesis=hyp, bridges_found_count=1, considered_candidates=[hyp.target_candidate.symbol]
             )
 
     engine = EpistemeEngine(
@@ -143,9 +146,7 @@ def test_complex_severity_threshold() -> None:
     """
 
     class UnicornBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
-        ) -> Optional[Hypothesis]:
+        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
             excluded = excluded_targets or []
 
             # 1. Toxic
@@ -160,7 +161,7 @@ def test_complex_severity_threshold() -> None:
             else:
                 target = GeneticTarget(symbol="IPGene", ensembl_id="E3", druggability_score=0.9, novelty_score=0.9)
 
-            return Hypothesis(
+            hyp = Hypothesis(
                 id=str(uuid.uuid4()),
                 title="Hypothesis",
                 knowledge_gap=gap.description,
@@ -172,6 +173,7 @@ def test_complex_severity_threshold() -> None:
                 evidence_chain=[],
                 confidence=ConfidenceLevel.SPECULATIVE,
             )
+            return BridgeResult(hypothesis=hyp, bridges_found_count=1, considered_candidates=[target.symbol])
 
     class ComplexReviewer(MockAdversarialReviewer):
         def review(self, hypothesis: Hypothesis) -> Hypothesis:

@@ -18,7 +18,7 @@ from coreason_episteme.interfaces import (
     ProtocolDesigner,
     VeritasClient,
 )
-from coreason_episteme.models import CritiqueSeverity, Hypothesis
+from coreason_episteme.models import CritiqueSeverity, Hypothesis, HypothesisTrace
 from coreason_episteme.utils.logger import logger
 
 
@@ -69,31 +69,43 @@ class EpistemeEngine:
             max_retries = 3
             attempts = 0
 
+            # Initialize Trace
+            trace = HypothesisTrace(gap=gap, status="PENDING")
+
             while attempts < max_retries:
                 attempts += 1
+                trace.excluded_targets_history = list(excluded_targets)  # Update history
+                trace.refinement_retries = attempts - 1
+
                 logger.info(
                     f"Attempt {attempts}/{max_retries} for gap: {gap.description[:50]}... "
                     f"(Excluded: {len(excluded_targets)})"
                 )
 
                 # 2. Latent Bridging
-                hypothesis = self.bridge_builder.generate_hypothesis(gap, excluded_targets=excluded_targets)
+                bridge_result = self.bridge_builder.generate_hypothesis(gap, excluded_targets=excluded_targets)
+
+                # Accumulate bridge metadata
+                trace.bridges_found_count = bridge_result.bridges_found_count
+                trace.considered_candidates = bridge_result.considered_candidates
+
+                hypothesis = bridge_result.hypothesis
                 if not hypothesis:
                     logger.info("No hypothesis generated for gap.")
+                    trace.status = "DISCARDED (No Bridge)"
+                    # Log trace if failed completely to find a bridge?
+                    # Yes, we should log the attempt even if it failed.
                     break
+
+                # Link trace ID to hypothesis ID if available
+                trace.hypothesis_id = hypothesis.id
 
                 # 3. Causal Simulation
                 hypothesis = self.causal_validator.validate(hypothesis)
 
-                # Log Validation
-                self.veritas_client.log_trace(
-                    hypothesis.id,
-                    {
-                        "step": "CausalValidator",
-                        "causal_validation_score": hypothesis.causal_validation_score,
-                        "key_counterfactual": hypothesis.key_counterfactual,
-                    },
-                )
+                # Accumulate validation data
+                trace.causal_validation_score = hypothesis.causal_validation_score
+                trace.key_counterfactual = hypothesis.key_counterfactual
 
                 # Filtering Policy: Discard if causal plausibility is too low.
                 if hypothesis.causal_validation_score < 0.5:
@@ -101,32 +113,25 @@ class EpistemeEngine:
                         f"Hypothesis {hypothesis.id} discarded due to low causal score "
                         f"({hypothesis.causal_validation_score})."
                     )
-                    self.veritas_client.log_trace(
-                        hypothesis.id,
-                        {
-                            "event": "DISCARDED",
-                            "reason": "Low Causal Score",
-                            "score": hypothesis.causal_validation_score,
-                        },
-                    )
-                    break  # Assuming low score on best candidate means no good path, or we could continue filtering?
-                    # For now, let's assume if the best candidate fails causal check, we stop or loop?
-                    # The prompt implies refinement loop is for "Critique".
-                    # But low score is also a failure.
-                    # Let's sticking to refining on CRITIQUES for now as per PRD.
+                    trace.status = "DISCARDED (Low Causal Score)"
+                    # We break here, as per original logic, though in a real system we might loop.
+                    # Current logic is: break loop, move to next gap.
+                    break
 
                 # 4. Adversarial Review
                 hypothesis = self.adversarial_reviewer.review(hypothesis)
 
-                # Log Review
-                self.veritas_client.log_trace(
-                    hypothesis.id,
-                    {
-                        "step": "AdversarialReviewer",
-                        "critiques_count": len(hypothesis.critiques),
-                        "critiques": [c.model_dump() for c in hypothesis.critiques],
-                    },
-                )
+                # Accumulate critiques
+                # Note: If we retry, we might want to append critiques or just keep latest?
+                # The model says `critiques: List[Critique]`.
+                # If we loop, we might have critiques from previous failed candidates.
+                # However, the refinement loop restarts bridge building with a NEW candidate.
+                # So the critiques apply to the CURRENT hypothesis.
+                # The Trace model represents the lifecycle of generating *one valid hypothesis* for the gap.
+                # If we reject a candidate, we should probably clear the critiques or mark them as "historical"?
+                # But `Hypothesis` object itself is recreated.
+                # Let's overwrite critiques with the current hypothesis's critiques.
+                trace.critiques = hypothesis.critiques
 
                 # 5. Refinement Check
                 fatal_critiques = [c for c in hypothesis.critiques if c.severity == CritiqueSeverity.FATAL]
@@ -136,30 +141,39 @@ class EpistemeEngine:
                         f"Hypothesis {hypothesis.id} rejected due to FATAL critiques ({len(fatal_critiques)}). "
                         f"Refining loop -> Excluding {target_symbol}"
                     )
-                    self.veritas_client.log_trace(
-                        hypothesis.id,
-                        {
-                            "event": "REFINEMENT_RETRY",
-                            "reason": "FATAL Critiques",
-                            "excluded_target": target_symbol,
-                        },
-                    )
                     excluded_targets.append(target_symbol)
-                    continue  # Loop back to try next candidate
+                    # We loop back. The trace continues.
+                    # We might want to persist the "history" of rejected targets in more detail,
+                    # but `excluded_targets_history` captures the symbols.
+                    continue
                 else:
                     # Success!
                     # 6. Protocol Design
                     hypothesis = self.protocol_designer.design_experiment(hypothesis)
 
-                    self.veritas_client.log_trace(
-                        hypothesis.id,
-                        {
-                            "event": "PROTOCOL_DESIGNED",
-                            "killer_experiment_pico": hypothesis.killer_experiment_pico.model_dump(),
-                        },
-                    )
+                    trace.result = hypothesis
+                    trace.status = "ACCEPTED"
+
+                    # Log the final trace
+                    if trace.hypothesis_id:
+                        self.veritas_client.log_trace(
+                            trace.hypothesis_id,
+                            trace.model_dump(),
+                        )
+
                     results.append(hypothesis)
                     break  # Move to next gap
+
+            # If loop exhausted without success or broke early
+            if trace.status != "ACCEPTED":
+                # Log trace for failed attempt if we have an ID
+                # If we never got a hypothesis ID (e.g. no bridges), we generate a UUID or use None
+                # The interface requires hypothesis_id: str.
+                log_id = trace.hypothesis_id or f"failed-gap-{hash(gap.description)}"
+                self.veritas_client.log_trace(
+                    log_id,
+                    trace.model_dump(),
+                )
 
         logger.info(f"Engine finished. Generated {len(results)} hypotheses.")
         return results

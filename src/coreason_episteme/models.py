@@ -78,3 +78,41 @@ class Hypothesis(BaseModel):
 
     # Adversarial Review
     critiques: List[Critique] = Field(default_factory=list)
+
+
+class BridgeResult(BaseModel):
+    """
+    Result from the BridgeBuilder component.
+    Contains the generated hypothesis (if any) and metadata about the search process.
+    """
+
+    hypothesis: Optional[Hypothesis]
+    bridges_found_count: int
+    considered_candidates: List[str]  # Symbols of all candidates considered
+
+
+class HypothesisTrace(BaseModel):
+    """
+    Complete audit trail for the hypothesis generation process.
+    Captures the 'Why' and 'How' for scientific provenance.
+    """
+
+    hypothesis_id: Optional[str] = None
+    gap: KnowledgeGap
+
+    # Bridge Phase
+    bridges_found_count: int = 0
+    considered_candidates: List[str] = Field(default_factory=list)
+    excluded_targets_history: List[str] = Field(default_factory=list)
+
+    # Simulation Phase
+    causal_validation_score: Optional[float] = None
+    key_counterfactual: Optional[str] = None
+
+    # Critique Phase
+    critiques: List[Critique] = Field(default_factory=list)
+    refinement_retries: int = 0
+
+    # Outcome
+    result: Optional[Hypothesis] = None
+    status: str = "PENDING"  # ACCEPTED, DISCARDED, REJECTED

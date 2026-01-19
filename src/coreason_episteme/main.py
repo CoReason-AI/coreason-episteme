@@ -84,7 +84,6 @@ def generate_hypothesis(
         prism_client=prism_client,  # type: ignore
         codex_client=codex_client,  # type: ignore
         search_client=search_client,  # type: ignore
-        veritas_client=veritas_client,  # type: ignore
     )
 
     causal_validator = CausalValidatorImpl(
