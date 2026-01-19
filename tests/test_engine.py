@@ -11,8 +11,8 @@
 from typing import Optional
 
 import pytest
-from coreason_episteme.engine import EpistemeEngine
 
+from coreason_episteme.engine import EpistemeEngine
 from coreason_episteme.models import Hypothesis, KnowledgeGap
 from tests.mocks import (
     MockAdversarialReviewer,
