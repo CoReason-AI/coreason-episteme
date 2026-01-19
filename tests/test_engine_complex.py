@@ -29,6 +29,7 @@ from tests.mocks import (
     MockCausalValidator,
     MockGapScanner,
     MockProtocolDesigner,
+    MockVeritasClient,
 )
 
 
@@ -40,6 +41,7 @@ def engine() -> EpistemeEngine:
         causal_validator=MockCausalValidator(),
         adversarial_reviewer=MockAdversarialReviewer(),
         protocol_designer=MockProtocolDesigner(),
+        veritas_client=MockVeritasClient(),
     )
 
 
@@ -79,6 +81,7 @@ def test_refinement_max_retries_exceeded() -> None:
         causal_validator=MockCausalValidator(),
         adversarial_reviewer=MockAdversarialReviewer(),  # Will flag "Risky_" as FATAL
         protocol_designer=MockProtocolDesigner(),
+        veritas_client=MockVeritasClient(),
     )
 
     results = engine.run("TargetX")
@@ -124,6 +127,7 @@ def test_refinement_candidate_exhaustion() -> None:
         causal_validator=MockCausalValidator(),
         adversarial_reviewer=MockAdversarialReviewer(),
         protocol_designer=MockProtocolDesigner(),
+        veritas_client=MockVeritasClient(),
     )
 
     results = engine.run("TargetX")
@@ -192,6 +196,7 @@ def test_complex_severity_threshold() -> None:
         causal_validator=MockCausalValidator(),
         adversarial_reviewer=ComplexReviewer(),
         protocol_designer=MockProtocolDesigner(),
+        veritas_client=MockVeritasClient(),
     )
 
     results = engine.run("TargetX")
