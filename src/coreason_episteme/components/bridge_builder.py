@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
 import uuid
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from coreason_episteme.interfaces import (
     CodexClient,
@@ -58,7 +58,7 @@ class BridgeBuilderImpl:
             logger.info(f"Excluding targets: {excluded_targets}")
 
         # Default result (failure)
-        result_metadata = {"bridges_found_count": 0, "considered_candidates": []}
+        result_metadata: Dict[str, Any] = {"bridges_found_count": 0, "considered_candidates": []}
 
         if not gap.source_nodes or len(gap.source_nodes) < 2:
             logger.warning("Gap does not have enough source nodes to find bridges.")
@@ -112,10 +112,11 @@ class BridgeBuilderImpl:
 
         if not best_candidate:
             logger.info("No valid targets found among bridges (druggable & verified).")
+            # Explicitly cast or assure types to satisfy mypy strictness
             return BridgeResult(
                 hypothesis=None,
-                bridges_found_count=result_metadata["bridges_found_count"],
-                considered_candidates=result_metadata["considered_candidates"],
+                bridges_found_count=int(result_metadata["bridges_found_count"]),
+                considered_candidates=cast(List[str], result_metadata["considered_candidates"]),
             )
 
         # Construct Hypothesis
@@ -138,6 +139,6 @@ class BridgeBuilderImpl:
         logger.info(f"Generated hypothesis: {hypothesis.id}")
         return BridgeResult(
             hypothesis=hypothesis,
-            bridges_found_count=result_metadata["bridges_found_count"],
-            considered_candidates=result_metadata["considered_candidates"],
+            bridges_found_count=int(result_metadata["bridges_found_count"]),
+            considered_candidates=cast(List[str], result_metadata["considered_candidates"]),
         )

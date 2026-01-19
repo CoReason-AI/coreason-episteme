@@ -22,7 +22,7 @@ from coreason_episteme.interfaces import (
     SearchClient,
     VeritasClient,
 )
-from coreason_episteme.models import GeneticTarget, Hypothesis, KnowledgeGap
+from coreason_episteme.models import BridgeResult, GeneticTarget, Hypothesis, KnowledgeGap
 
 
 class MockGraphNexusClient:
@@ -82,10 +82,8 @@ class MockGapScanner:
 
 
 class MockBridgeBuilder:
-    def generate_hypothesis(
-        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
-    ) -> Optional[Hypothesis]:
-        return None
+    def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+        return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
 
 class MockCausalValidator:

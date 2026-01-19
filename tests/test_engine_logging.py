@@ -10,8 +10,8 @@
 
 
 import pytest
-from coreason_episteme.engine import EpistemeEngine
 
+from coreason_episteme.engine import EpistemeEngine
 from tests.mocks import (
     MockAdversarialReviewer,
     MockBridgeBuilder,

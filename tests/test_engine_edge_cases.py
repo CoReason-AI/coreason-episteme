@@ -11,6 +11,7 @@
 from typing import List, Optional
 
 import pytest
+
 from coreason_episteme.engine import EpistemeEngine
 from coreason_episteme.models import (
     PICO,
@@ -23,7 +24,6 @@ from coreason_episteme.models import (
     KnowledgeGap,
     KnowledgeGapType,
 )
-
 from tests.mocks import (
     MockAdversarialReviewer,
     MockBridgeBuilder,
@@ -98,7 +98,8 @@ def test_multi_gap_mixed_outcomes() -> None:
                     target_candidate=GeneticTarget(
                         symbol="GeneC", ensembl_id="E3", druggability_score=0.9, novelty_score=0.9
                     ),
-                    causal_validation_score=0.1,  # Will be overwritten by validator mock, so we need a smart validator mock
+                    # Will be overwritten by validator mock, so we need a smart validator mock
+                    causal_validation_score=0.1,
                     key_counterfactual="",
                     killer_experiment_pico=PICO(population="", intervention="", comparator="", outcome=""),
                     evidence_chain=[],

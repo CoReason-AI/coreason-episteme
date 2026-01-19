@@ -8,12 +8,12 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from typing import List, Optional
+from typing import List, Optional, cast
 
 import pytest
+
 from coreason_episteme.engine import EpistemeEngine
 from coreason_episteme.models import BridgeResult, KnowledgeGap
-
 from tests.mocks import (
     MockAdversarialReviewer,
     MockBridgeBuilder,
@@ -54,7 +54,7 @@ def test_engine_run_happy_path(engine: EpistemeEngine) -> None:
     assert len(hypothesis.critiques) == 0
 
     # Verify Trace Logging
-    veritas = engine.veritas_client  # type: ignore
+    veritas = cast(MockVeritasClient, engine.veritas_client)
     assert len(veritas.traces) == 1
     trace = veritas.traces[0]["data"]
     assert trace["status"] == "ACCEPTED"
@@ -91,7 +91,7 @@ def test_engine_run_low_causal_score(engine: EpistemeEngine) -> None:
     assert len(results) == 0
 
     # Verify Trace Logs "DISCARDED"
-    veritas = bad_engine.veritas_client  # type: ignore
+    veritas = cast(MockVeritasClient, bad_engine.veritas_client)
     assert len(veritas.traces) == 1
     assert veritas.traces[0]["data"]["status"] == "DISCARDED (Low Causal Score)"
 
@@ -140,7 +140,7 @@ def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
     assert len(hypothesis.critiques) == 0
 
     # Verify Trace shows retries
-    veritas = refinement_engine.veritas_client  # type: ignore
+    veritas = cast(MockVeritasClient, refinement_engine.veritas_client)
     assert len(veritas.traces) == 1
     trace = veritas.traces[0]["data"]
     assert trace["status"] == "ACCEPTED"
@@ -168,6 +168,6 @@ def test_engine_run_bridge_failure(engine: EpistemeEngine) -> None:
     assert len(results) == 0
 
     # Verify Trace
-    veritas = broken_engine.veritas_client  # type: ignore
+    veritas = cast(MockVeritasClient, broken_engine.veritas_client)
     assert len(veritas.traces) == 1
     assert veritas.traces[0]["data"]["status"] == "DISCARDED (No Bridge)"

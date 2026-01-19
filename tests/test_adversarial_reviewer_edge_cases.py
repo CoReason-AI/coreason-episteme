@@ -11,6 +11,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+
 from coreason_episteme.components.adversarial_reviewer import AdversarialReviewerImpl
 from coreason_episteme.models import (
     PICO,

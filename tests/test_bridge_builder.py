@@ -11,6 +11,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+
 from coreason_episteme.components.bridge_builder import BridgeBuilderImpl
 from coreason_episteme.models import (
     BridgeResult,
