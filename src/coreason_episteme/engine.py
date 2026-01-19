@@ -16,6 +16,7 @@ from coreason_episteme.interfaces import (
     CausalValidator,
     GapScanner,
     ProtocolDesigner,
+    VeritasClient,
 )
 from coreason_episteme.models import CritiqueSeverity, Hypothesis
 from coreason_episteme.utils.logger import logger
@@ -34,12 +35,14 @@ class EpistemeEngine:
         causal_validator: CausalValidator,
         adversarial_reviewer: AdversarialReviewer,
         protocol_designer: ProtocolDesigner,
+        veritas_client: VeritasClient,
     ):
         self.gap_scanner = gap_scanner
         self.bridge_builder = bridge_builder
         self.causal_validator = causal_validator
         self.adversarial_reviewer = adversarial_reviewer
         self.protocol_designer = protocol_designer
+        self.veritas_client = veritas_client
 
     def run(self, disease_id: str) -> List[Hypothesis]:
         """
@@ -82,11 +85,29 @@ class EpistemeEngine:
                 # 3. Causal Simulation
                 hypothesis = self.causal_validator.validate(hypothesis)
 
+                # Log Validation
+                self.veritas_client.log_trace(
+                    hypothesis.id,
+                    {
+                        "step": "CausalValidator",
+                        "causal_validation_score": hypothesis.causal_validation_score,
+                        "key_counterfactual": hypothesis.key_counterfactual,
+                    },
+                )
+
                 # Filtering Policy: Discard if causal plausibility is too low.
                 if hypothesis.causal_validation_score < 0.5:
                     logger.info(
                         f"Hypothesis {hypothesis.id} discarded due to low causal score "
                         f"({hypothesis.causal_validation_score})."
+                    )
+                    self.veritas_client.log_trace(
+                        hypothesis.id,
+                        {
+                            "event": "DISCARDED",
+                            "reason": "Low Causal Score",
+                            "score": hypothesis.causal_validation_score,
+                        },
                     )
                     break  # Assuming low score on best candidate means no good path, or we could continue filtering?
                     # For now, let's assume if the best candidate fails causal check, we stop or loop?
@@ -97,6 +118,16 @@ class EpistemeEngine:
                 # 4. Adversarial Review
                 hypothesis = self.adversarial_reviewer.review(hypothesis)
 
+                # Log Review
+                self.veritas_client.log_trace(
+                    hypothesis.id,
+                    {
+                        "step": "AdversarialReviewer",
+                        "critiques_count": len(hypothesis.critiques),
+                        "critiques": [c.model_dump() for c in hypothesis.critiques],
+                    },
+                )
+
                 # 5. Refinement Check
                 fatal_critiques = [c for c in hypothesis.critiques if c.severity == CritiqueSeverity.FATAL]
                 if fatal_critiques:
@@ -105,12 +136,28 @@ class EpistemeEngine:
                         f"Hypothesis {hypothesis.id} rejected due to FATAL critiques ({len(fatal_critiques)}). "
                         f"Refining loop -> Excluding {target_symbol}"
                     )
+                    self.veritas_client.log_trace(
+                        hypothesis.id,
+                        {
+                            "event": "REFINEMENT_RETRY",
+                            "reason": "FATAL Critiques",
+                            "excluded_target": target_symbol,
+                        },
+                    )
                     excluded_targets.append(target_symbol)
                     continue  # Loop back to try next candidate
                 else:
                     # Success!
                     # 6. Protocol Design
                     hypothesis = self.protocol_designer.design_experiment(hypothesis)
+
+                    self.veritas_client.log_trace(
+                        hypothesis.id,
+                        {
+                            "event": "PROTOCOL_DESIGNED",
+                            "killer_experiment_pico": hypothesis.killer_experiment_pico.model_dump(),
+                        },
+                    )
                     results.append(hypothesis)
                     break  # Move to next gap
 
