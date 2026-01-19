@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from typing import Optional
+from typing import List, Optional
 
 import pytest
 
@@ -62,7 +62,9 @@ def test_engine_run_low_causal_score(engine: EpistemeEngine) -> None:
     """Test that hypotheses with low causal scores are filtered out."""
 
     class BadTargetBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap) -> Optional[Hypothesis]:
+        def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> Optional[Hypothesis]:
             h = super().generate_hypothesis(gap)
             if h:
                 h.target_candidate.symbol = "BadTarget"
@@ -81,35 +83,58 @@ def test_engine_run_low_causal_score(engine: EpistemeEngine) -> None:
     assert len(results) == 0
 
 
-def test_engine_run_adversarial_critiques(engine: EpistemeEngine) -> None:
-    """Test that critiques are attached."""
+def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
+    """
+    Test the Refinement Loop:
+    1. First candidate is 'RiskyTarget' -> Triggers FATAL critique.
+    2. Engine excludes 'RiskyTarget' and retries.
+    3. Second candidate is 'SafeTarget' -> Success.
+    """
 
-    class RiskyBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap) -> Optional[Hypothesis]:
+    class RefinementBridgeBuilder(MockBridgeBuilder):
+        def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> Optional[Hypothesis]:
+            # If RiskyTarget is NOT excluded, return it first
+            if not excluded_targets or "RiskyTarget" not in excluded_targets:
+                h = super().generate_hypothesis(gap)
+                if h:
+                    h.target_candidate.symbol = "RiskyTarget"
+                return h
+
+            # If RiskyTarget IS excluded, return SafeTarget
             h = super().generate_hypothesis(gap)
             if h:
-                h.target_candidate.symbol = "RiskyTarget"
+                h.target_candidate.symbol = "SafeTarget"
             return h
 
-    risky_engine = EpistemeEngine(
+    refinement_engine = EpistemeEngine(
         gap_scanner=MockGapScanner(),
-        bridge_builder=RiskyBridgeBuilder(),
+        bridge_builder=RefinementBridgeBuilder(),
         causal_validator=MockCausalValidator(),
         adversarial_reviewer=MockAdversarialReviewer(),
         protocol_designer=MockProtocolDesigner(),
     )
 
-    results = risky_engine.run("TargetX")
+    results = refinement_engine.run("TargetX")
+
+    # Should succeed eventually
     assert len(results) == 1
-    # Check critiques
-    assert "Toxicology risk detected." in results[0].critiques
+    hypothesis = results[0]
+
+    # Verify we got the SafeTarget eventually
+    assert hypothesis.target_candidate.symbol == "SafeTarget"
+    # SafeTarget shouldn't have FATAL critiques
+    assert len(hypothesis.critiques) == 0
 
 
 def test_engine_run_bridge_failure(engine: EpistemeEngine) -> None:
     """Test engine when bridge builder fails to generate a hypothesis."""
 
     class BrokenBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap) -> Optional[Hypothesis]:
+        def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> Optional[Hypothesis]:
             return None
 
     broken_engine = EpistemeEngine(
