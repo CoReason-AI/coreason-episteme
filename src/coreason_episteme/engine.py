@@ -17,7 +17,7 @@ from coreason_episteme.interfaces import (
     GapScanner,
     ProtocolDesigner,
 )
-from coreason_episteme.models import Hypothesis
+from coreason_episteme.models import CritiqueSeverity, Hypothesis
 from coreason_episteme.utils.logger import logger
 
 
@@ -49,7 +49,8 @@ class EpistemeEngine:
         2. Generate Hypotheses (Bridge the Gaps).
         3. Validate (Causal Simulation).
         4. Adversarial Review (Critique).
-        5. Protocol Design (Experiment).
+        5. Refinement Loop: If FATAL critiques exist, exclude target and retry.
+        6. Protocol Design (Experiment).
         """
         logger.info(f"Starting Episteme Engine for: {disease_id}")
         results: List[Hypothesis] = []
@@ -61,31 +62,57 @@ class EpistemeEngine:
             return []
 
         for gap in gaps:
-            # 2. Latent Bridging
-            hypothesis = self.bridge_builder.generate_hypothesis(gap)
-            if not hypothesis:
-                continue
+            excluded_targets: List[str] = []
+            max_retries = 3
+            attempts = 0
 
-            # 3. Causal Simulation
-            hypothesis = self.causal_validator.validate(hypothesis)
-
-            # Filtering Policy: Discard if causal plausibility is too low.
-            # Assuming a threshold of 0.5 for "Plausible" enough to proceed.
-            if hypothesis.causal_validation_score < 0.5:
+            while attempts < max_retries:
+                attempts += 1
                 logger.info(
-                    f"Hypothesis {hypothesis.id} discarded due to low causal score "
-                    f"({hypothesis.causal_validation_score})."
+                    f"Attempt {attempts}/{max_retries} for gap: {gap.description[:50]}... "
+                    f"(Excluded: {len(excluded_targets)})"
                 )
-                continue
 
-            # 4. Adversarial Review
-            hypothesis = self.adversarial_reviewer.review(hypothesis)
+                # 2. Latent Bridging
+                hypothesis = self.bridge_builder.generate_hypothesis(gap, excluded_targets=excluded_targets)
+                if not hypothesis:
+                    logger.info("No hypothesis generated for gap.")
+                    break
 
-            # 5. Protocol Design
-            # Only design experiments for surviving hypotheses
-            hypothesis = self.protocol_designer.design_experiment(hypothesis)
+                # 3. Causal Simulation
+                hypothesis = self.causal_validator.validate(hypothesis)
 
-            results.append(hypothesis)
+                # Filtering Policy: Discard if causal plausibility is too low.
+                if hypothesis.causal_validation_score < 0.5:
+                    logger.info(
+                        f"Hypothesis {hypothesis.id} discarded due to low causal score "
+                        f"({hypothesis.causal_validation_score})."
+                    )
+                    break  # Assuming low score on best candidate means no good path, or we could continue filtering?
+                    # For now, let's assume if the best candidate fails causal check, we stop or loop?
+                    # The prompt implies refinement loop is for "Critique".
+                    # But low score is also a failure.
+                    # Let's sticking to refining on CRITIQUES for now as per PRD.
+
+                # 4. Adversarial Review
+                hypothesis = self.adversarial_reviewer.review(hypothesis)
+
+                # 5. Refinement Check
+                fatal_critiques = [c for c in hypothesis.critiques if c.severity == CritiqueSeverity.FATAL]
+                if fatal_critiques:
+                    target_symbol = hypothesis.target_candidate.symbol
+                    logger.warning(
+                        f"Hypothesis {hypothesis.id} rejected due to FATAL critiques ({len(fatal_critiques)}). "
+                        f"Refining loop -> Excluding {target_symbol}"
+                    )
+                    excluded_targets.append(target_symbol)
+                    continue  # Loop back to try next candidate
+                else:
+                    # Success!
+                    # 6. Protocol Design
+                    hypothesis = self.protocol_designer.design_experiment(hypothesis)
+                    results.append(hypothesis)
+                    break  # Move to next gap
 
         logger.info(f"Engine finished. Generated {len(results)} hypotheses.")
         return results

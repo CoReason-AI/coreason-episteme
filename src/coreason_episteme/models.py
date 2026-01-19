@@ -25,6 +25,19 @@ class KnowledgeGapType(str, Enum):
     LITERATURE_INCONSISTENCY = "LITERATURE_INCONSISTENCY"
 
 
+class CritiqueSeverity(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    FATAL = "FATAL"
+
+
+class Critique(BaseModel):
+    source: str
+    content: str
+    severity: CritiqueSeverity
+
+
 class PICO(BaseModel):
     population: str
     intervention: str
@@ -64,4 +77,4 @@ class Hypothesis(BaseModel):
     confidence: ConfidenceLevel
 
     # Adversarial Review
-    critiques: List[str] = Field(default_factory=list)
+    critiques: List[Critique] = Field(default_factory=list)

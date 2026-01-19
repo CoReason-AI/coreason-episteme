@@ -14,6 +14,8 @@ from typing import List, Optional
 from coreason_episteme.models import (
     PICO,
     ConfidenceLevel,
+    Critique,
+    CritiqueSeverity,
     GeneticTarget,
     Hypothesis,
     KnowledgeGap,
@@ -53,9 +55,29 @@ class MockGapScanner:
 
 
 class MockBridgeBuilder:
-    def generate_hypothesis(self, gap: KnowledgeGap) -> Optional[Hypothesis]:
+    def generate_hypothesis(
+        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+    ) -> Optional[Hypothesis]:
         if "Unbridgeable" in gap.description:
             return None
+
+        # Basic filtering simulation for mocks
+        if excluded_targets and "MOCK1" in excluded_targets:
+            # Return a backup if MOCK1 is excluded
+            return Hypothesis(
+                id=str(uuid.uuid4()),
+                title="Mock Hypothesis Backup",
+                knowledge_gap=gap.description,
+                proposed_mechanism="Mock Mechanism Backup",
+                target_candidate=GeneticTarget(
+                    symbol="MOCK2", ensembl_id="ENSG000002", druggability_score=0.8, novelty_score=0.7
+                ),
+                causal_validation_score=0.0,
+                key_counterfactual="",
+                killer_experiment_pico=PICO(population="", intervention="", comparator="", outcome=""),
+                evidence_chain=[],
+                confidence=ConfidenceLevel.SPECULATIVE,
+            )
 
         return Hypothesis(
             id=str(uuid.uuid4()),
@@ -87,7 +109,9 @@ class MockCausalValidator:
 class MockAdversarialReviewer:
     def review(self, hypothesis: Hypothesis) -> Hypothesis:
         if "Risky" in hypothesis.target_candidate.symbol:
-            hypothesis.critiques.append("Toxicology risk detected.")
+            hypothesis.critiques.append(
+                Critique(source="Toxicologist", content="Toxicology risk detected.", severity=CritiqueSeverity.FATAL)
+            )
         return hypothesis
 
 

@@ -16,6 +16,7 @@ from coreason_episteme.components.adversarial_reviewer import AdversarialReviewe
 from coreason_episteme.models import (
     PICO,
     ConfidenceLevel,
+    CritiqueSeverity,
     GeneticTarget,
     Hypothesis,
 )
@@ -109,7 +110,10 @@ def test_review_toxicology_fail(
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 1
-    assert "[Toxicologist] Liver Toxicity Risk" in reviewed_hypothesis.critiques[0]
+    critique = reviewed_hypothesis.critiques[0]
+    assert critique.source == "Toxicologist"
+    assert critique.content == "Liver Toxicity Risk"
+    assert critique.severity == CritiqueSeverity.FATAL
 
 
 def test_review_skeptic_fail(
@@ -132,8 +136,10 @@ def test_review_skeptic_fail(
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 1
-    assert "[Scientific Skeptic]" in reviewed_hypothesis.critiques[0]
-    assert "Paper X (2020)" in reviewed_hypothesis.critiques[0]
+    critique = reviewed_hypothesis.critiques[0]
+    assert critique.source == "Scientific Skeptic"
+    assert "Paper X (2020)" in critique.content
+    assert critique.severity == CritiqueSeverity.FATAL
 
     # Check arguments
     mock_search_client.find_disconfirming_evidence.assert_called_once_with(
@@ -159,8 +165,10 @@ def test_review_multiple_critiques(
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 4
-    critique_texts = " ".join(reviewed_hypothesis.critiques)
-    assert "[Toxicologist]" in critique_texts
-    assert "[Clinician]" in critique_texts
-    assert "[IP Strategist]" in critique_texts
-    assert "[Scientific Skeptic]" in critique_texts
+
+    # Check severities
+    critique_map = {c.source: c.severity for c in reviewed_hypothesis.critiques}
+    assert critique_map["Toxicologist"] == CritiqueSeverity.FATAL
+    assert critique_map["Clinician"] == CritiqueSeverity.MEDIUM
+    assert critique_map["IP Strategist"] == CritiqueSeverity.HIGH
+    assert critique_map["Scientific Skeptic"] == CritiqueSeverity.FATAL
