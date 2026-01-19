@@ -41,7 +41,7 @@ def engine(mock_veritas: MockVeritasClient) -> EpistemeEngine:
 
 
 def test_engine_lifecycle_logging(engine: EpistemeEngine, mock_veritas: MockVeritasClient) -> None:
-    """Test that engine logs all lifecycle events."""
+    """Test that engine logs all lifecycle events in a single consolidated trace."""
     results = engine.run("TargetX")
     assert len(results) == 1
     hypothesis_id = results[0].id
@@ -49,20 +49,19 @@ def test_engine_lifecycle_logging(engine: EpistemeEngine, mock_veritas: MockVeri
     # Filter traces for this hypothesis
     traces = [t for t in mock_veritas.traces if t["id"] == hypothesis_id]
 
-    # We expect logs for:
-    # 1. Causal Validation
-    # 2. Adversarial Review
-    # 3. Protocol Design (Completion)
+    # We now expect exactly ONE trace per successful hypothesis generation
+    assert len(traces) == 1
+    trace_data = traces[0]["data"]
 
-    # Check Causal Validation Log
-    validation_logs = [t for t in traces if "causal_validation_score" in t["data"]]
-    assert len(validation_logs) == 1
-    assert validation_logs[0]["data"]["causal_validation_score"] == 0.85
+    # Verify Causal Validation data is present
+    assert "causal_validation_score" in trace_data
+    assert trace_data["causal_validation_score"] == 0.85
 
-    # Check Review Log
-    review_logs = [t for t in traces if "critiques_count" in t["data"]]
-    assert len(review_logs) == 1
+    # Verify Review data is present (even if empty list, the field should exist)
+    assert "critiques" in trace_data
 
-    # Check Completion Log
-    completion_logs = [t for t in traces if "event" in t["data"] and t["data"]["event"] == "PROTOCOL_DESIGNED"]
-    assert len(completion_logs) == 1
+    # Verify Status
+    assert trace_data["status"] == "ACCEPTED"
+
+    # Verify Metadata
+    assert trace_data["bridges_found_count"] > 0
