@@ -249,3 +249,44 @@ def test_generate_hypothesis_insufficient_nodes(
     assert bridge_builder.generate_hypothesis(gap_one_node) is None
     assert bridge_builder.generate_hypothesis(gap_no_node) is None
     assert bridge_builder.generate_hypothesis(gap_none) is None
+
+
+def test_generate_hypothesis_excluded_targets(
+    bridge_builder: BridgeBuilderImpl,
+    mock_graph_client: MagicMock,
+    mock_prism_client: MagicMock,
+    mock_codex_client: MagicMock,
+    mock_search_client: MagicMock,
+) -> None:
+    """Test filtering of excluded targets."""
+    gap = KnowledgeGap(
+        description="Gap",
+        source_nodes=["NodeA", "NodeB"],
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
+
+    # Candidate 1: Toxic (excluded)
+    target_toxic = GeneticTarget(
+        symbol="ToxicGene",
+        ensembl_id="ENSG000001",
+        druggability_score=0.9,
+        novelty_score=0.8,
+    )
+    # Candidate 2: Safe
+    target_safe = GeneticTarget(
+        symbol="SafeGene",
+        ensembl_id="ENSG000002",
+        druggability_score=0.8,
+        novelty_score=0.8,
+    )
+
+    mock_graph_client.find_latent_bridges.return_value = [target_toxic, target_safe]
+    mock_prism_client.check_druggability.return_value = 0.9
+    mock_codex_client.validate_target.side_effect = lambda s: target_toxic if s == "ToxicGene" else target_safe
+    mock_search_client.verify_citation.return_value = True
+
+    # Exclude ToxicGene
+    hypothesis = bridge_builder.generate_hypothesis(gap, excluded_targets=["ToxicGene"])
+
+    assert hypothesis is not None
+    assert hypothesis.target_candidate.symbol == "SafeGene"

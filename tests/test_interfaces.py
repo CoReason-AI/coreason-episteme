@@ -82,7 +82,9 @@ class MockGapScanner:
 
 
 class MockBridgeBuilder:
-    def generate_hypothesis(self, gap: KnowledgeGap) -> Optional[Hypothesis]:
+    def generate_hypothesis(
+        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+    ) -> Optional[Hypothesis]:
         return None
 
 

@@ -108,8 +108,9 @@ def test_review_high_volume_critiques(
 
     # Should have 150 critiques
     assert len(reviewed_hypothesis.critiques) == 150
-    assert "[Toxicologist] Risk 49" in reviewed_hypothesis.critiques
-    assert "[Clinician] Redundancy 0" in reviewed_hypothesis.critiques
+    # Updated assertions to check Critique object content
+    assert any("Risk 49" in c.content and c.source == "Toxicologist" for c in reviewed_hypothesis.critiques)
+    assert any("Redundancy 0" in c.content and c.source == "Clinician" for c in reviewed_hypothesis.critiques)
 
 
 def test_review_exception_propagation(
@@ -152,8 +153,8 @@ def test_review_cumulative_critiques(
 
     # Should have 2 critiques now (Risk A + Risk B)
     assert len(hypo_v2.critiques) == 2
-    assert any("Risk A" in c for c in hypo_v2.critiques)
-    assert any("Risk B" in c for c in hypo_v2.critiques)
+    assert any("Risk A" in c.content for c in hypo_v2.critiques)
+    assert any("Risk B" in c.content for c in hypo_v2.critiques)
 
 
 def test_review_scientific_skeptic_failure_handling(
@@ -197,11 +198,12 @@ def test_review_all_reviewers_trigger(
     reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
 
     assert len(reviewed_hypothesis.critiques) == 4
-    critique_text = " ".join(reviewed_hypothesis.critiques)
-    assert "[Toxicologist]" in critique_text
-    assert "[Clinician]" in critique_text
-    assert "[IP Strategist]" in critique_text
-    assert "[Scientific Skeptic]" in critique_text
+
+    critique_sources = {c.source for c in reviewed_hypothesis.critiques}
+    assert "Toxicologist" in critique_sources
+    assert "Clinician" in critique_sources
+    assert "IP Strategist" in critique_sources
+    assert "Scientific Skeptic" in critique_sources
 
 
 def test_review_empty_strings_robustness(

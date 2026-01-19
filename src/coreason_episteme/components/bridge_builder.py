@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
 import uuid
-from typing import Optional
+from typing import List, Optional
 
 from coreason_episteme.interfaces import (
     CodexClient,
@@ -44,18 +44,23 @@ class BridgeBuilderImpl:
         self.search_client = search_client
         self.veritas_client = veritas_client
 
-    def generate_hypothesis(self, gap: KnowledgeGap) -> Optional[Hypothesis]:
+    def generate_hypothesis(
+        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+    ) -> Optional[Hypothesis]:
         """
         Generates a hypothesis bridging the knowledge gap.
 
         1. Queries GraphNexus for latent bridges between source nodes.
-        2. Filters bridges for druggability via Prism.
-        3. Validates target via Codex.
-        4. Verifies citations via Search (Hallucination Check).
-        5. Logs trace via Veritas.
-        6. Constructs a Hypothesis.
+        2. Filters out excluded_targets.
+        3. Filters bridges for druggability via Prism.
+        4. Validates target via Codex.
+        5. Verifies citations via Search (Hallucination Check).
+        6. Logs trace via Veritas.
+        7. Constructs a Hypothesis.
         """
         logger.info(f"Attempting to build bridge for gap: {gap.description}")
+        if excluded_targets:
+            logger.info(f"Excluding targets: {excluded_targets}")
 
         if not gap.source_nodes or len(gap.source_nodes) < 2:
             logger.warning("Gap does not have enough source nodes to find bridges.")
@@ -73,6 +78,11 @@ class BridgeBuilderImpl:
         best_druggability = -1.0
 
         for bridge in potential_bridges:
+            # Check exclusions
+            if excluded_targets and bridge.symbol in excluded_targets:
+                logger.debug(f"Skipping excluded target: {bridge.symbol}")
+                continue
+
             # Check druggability
             druggability = self.prism_client.check_druggability(bridge.ensembl_id)
             if druggability > 0.5:  # Threshold for "druggable"
@@ -125,6 +135,7 @@ class BridgeBuilderImpl:
             "bridges_found": len(potential_bridges),
             "selected_target": best_candidate.symbol,
             "mechanism": mechanism,
+            "excluded_targets": excluded_targets if excluded_targets else [],
         }
         self.veritas_client.log_trace(hypothesis_id, trace_data)
 
