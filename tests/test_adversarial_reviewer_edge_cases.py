@@ -154,3 +154,76 @@ def test_review_cumulative_critiques(
     assert len(hypo_v2.critiques) == 2
     assert any("Risk A" in c for c in hypo_v2.critiques)
     assert any("Risk B" in c for c in hypo_v2.critiques)
+
+
+def test_review_scientific_skeptic_failure_handling(
+    adversarial_reviewer: AdversarialReviewerImpl,
+    mock_inference_client: MagicMock,
+    mock_search_client: MagicMock,
+    sample_hypothesis: Hypothesis,
+) -> None:
+    """
+    Test Edge Case: Scientific Skeptic returns None or invalid data.
+    The system should treat None as 'no evidence found' (similar to empty list).
+    """
+    mock_inference_client.run_toxicology_screen.return_value = []
+    mock_inference_client.check_clinical_redundancy.return_value = []
+    mock_search_client.check_patent_infringement.return_value = []
+
+    # Simulate None return from search client
+    mock_search_client.find_disconfirming_evidence.return_value = None
+
+    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+
+    # Should have 0 critiques
+    assert len(reviewed_hypothesis.critiques) == 0
+
+
+def test_review_all_reviewers_trigger(
+    adversarial_reviewer: AdversarialReviewerImpl,
+    mock_inference_client: MagicMock,
+    mock_search_client: MagicMock,
+    sample_hypothesis: Hypothesis,
+) -> None:
+    """
+    Test Complex Scenario: Every single reviewer finds an issue.
+    Ensures that the hypothesis accumulates all types of critiques correctly.
+    """
+    mock_inference_client.run_toxicology_screen.return_value = ["Toxic"]
+    mock_inference_client.check_clinical_redundancy.return_value = ["Redundant"]
+    mock_search_client.check_patent_infringement.return_value = ["Patent Breach"]
+    mock_search_client.find_disconfirming_evidence.return_value = ["Paper says NO"]
+
+    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+
+    assert len(reviewed_hypothesis.critiques) == 4
+    critique_text = " ".join(reviewed_hypothesis.critiques)
+    assert "[Toxicologist]" in critique_text
+    assert "[Clinician]" in critique_text
+    assert "[IP Strategist]" in critique_text
+    assert "[Scientific Skeptic]" in critique_text
+
+
+def test_review_empty_strings_robustness(
+    adversarial_reviewer: AdversarialReviewerImpl,
+    mock_inference_client: MagicMock,
+    mock_search_client: MagicMock,
+    sample_hypothesis: Hypothesis,
+) -> None:
+    """
+    Test Edge Case: Empty strings in hypothesis fields used for search.
+    """
+    mock_inference_client.run_toxicology_screen.return_value = []
+    mock_inference_client.check_clinical_redundancy.return_value = []
+    mock_search_client.check_patent_infringement.return_value = []
+    mock_search_client.find_disconfirming_evidence.return_value = []
+
+    # Set fields to empty strings
+    sample_hypothesis.target_candidate.symbol = ""
+    sample_hypothesis.knowledge_gap = ""
+
+    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+
+    # Verify call was still made with empty strings
+    mock_search_client.find_disconfirming_evidence.assert_called_once_with(subject="", object="", action="affect")
+    assert len(reviewed_hypothesis.critiques) == 0
