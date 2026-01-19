@@ -67,6 +67,9 @@ class MockSearchClient:
     def check_patent_infringement(self, target_candidate: GeneticTarget, mechanism: str) -> List[str]:
         return []
 
+    def find_disconfirming_evidence(self, subject: str, object: str, action: str) -> List[str]:
+        return []
+
 
 class MockVeritasClient:
     def log_trace(self, hypothesis_id: str, trace_data: Dict[str, Any]) -> None:
