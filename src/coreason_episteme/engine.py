@@ -28,7 +28,18 @@ from coreason_episteme.utils.logger import logger
 class EpistemeEngine:
     """
     The Hypothesis Engine (Theorist).
-    Orchestrates the Scan-Bridge-Simulate-Critique loop.
+
+    Orchestrates the Scan-Bridge-Simulate-Critique loop to generate and validate
+    scientific hypotheses.
+
+    Attributes:
+        gap_scanner: Component to identify knowledge gaps.
+        bridge_builder: Component to propose hypotheses bridging gaps.
+        causal_validator: Component to simulate and validate mechanisms.
+        adversarial_reviewer: Component to critique hypotheses.
+        protocol_designer: Component to design validation experiments.
+        veritas_client: Client for logging provenance traces.
+        max_retries: Maximum number of refinement attempts for a single gap.
     """
 
     gap_scanner: GapScanner
@@ -43,12 +54,20 @@ class EpistemeEngine:
         """
         Executes the hypothesis generation pipeline for a given disease ID.
 
-        1. Scan for Knowledge Gaps.
-        2. Generate Hypotheses (Bridge the Gaps).
-        3. Validate (Causal Simulation).
-        4. Adversarial Review (Critique).
-        5. Refinement Loop: If FATAL critiques exist, exclude target and retry.
-        6. Protocol Design (Experiment).
+        Pipeline Steps:
+        1. Scan for Knowledge Gaps (GapScanner).
+        2. Generate Hypotheses (BridgeBuilder).
+        3. Validate via Causal Simulation (CausalValidator).
+        4. Adversarial Review (AdversarialReviewer).
+        5. Refinement Loop: If FATAL critiques exist, exclude the target and retry (up to max_retries).
+        6. Protocol Design (ProtocolDesigner).
+        7. Logging and Provenance (VeritasClient).
+
+        Args:
+            disease_id: The identifier of the disease or condition to investigate.
+
+        Returns:
+            A list of validated and critiqued Hypothesis objects.
         """
         logger.info(f"Starting Episteme Engine for: {disease_id}")
         results: List[Hypothesis] = []

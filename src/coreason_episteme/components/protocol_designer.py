@@ -17,8 +17,16 @@ class ProtocolDesignerImpl:
 
     def design_experiment(self, hypothesis: Hypothesis) -> Hypothesis:
         """
-        Designs the killer experiment for the hypothesis.
-        Updates the hypothesis with PICO details.
+        Designs the "Killer Experiment" (PICO) to validate the hypothesis.
+
+        Defines the Population, Intervention, Comparator, and Outcome (PICO)
+        necessary to prove or disprove the hypothesis in a wet lab setting.
+
+        Args:
+            hypothesis: The hypothesis to design an experiment for.
+
+        Returns:
+            The hypothesis object updated with the experimental design (PICO).
         """
         logger.info(f"Designing experiment for hypothesis: {hypothesis.id}")
 
