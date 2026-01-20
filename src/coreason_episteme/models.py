@@ -8,6 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+import uuid
 from enum import Enum
 from typing import List, Optional
 
@@ -53,6 +54,7 @@ class GeneticTarget(BaseModel):
 
 
 class KnowledgeGap(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     description: str
     type: KnowledgeGapType
     source_nodes: Optional[List[str]] = None
@@ -98,6 +100,8 @@ class HypothesisTrace(BaseModel):
     """
 
     hypothesis_id: Optional[str] = None
+    gap_id: Optional[str] = None
+    bridge_id: Optional[str] = None
     gap: KnowledgeGap
 
     # Bridge Phase

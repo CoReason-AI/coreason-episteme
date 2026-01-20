@@ -30,6 +30,7 @@ def test_mock_gap_scanner_scan_found() -> None:
 
     assert len(gaps) == 1
     assert isinstance(gaps[0], KnowledgeGap)
+    assert gaps[0].id is not None  # Verify ID is generated
     assert "DiseaseX" in gaps[0].description
     assert gaps[0].source_nodes == ["PMID:123456", "PMID:789012"]
 
@@ -98,6 +99,7 @@ def test_scan_cluster_gap_found(
     # Verify
     assert len(gaps) == 1
     gap = gaps[0]
+    assert gap.id is not None  # Verify ID is generated
     assert gap.type == KnowledgeGapType.CLUSTER_DISCONNECT
     assert "Cluster A" in gap.description
     assert "Cluster B" in gap.description
