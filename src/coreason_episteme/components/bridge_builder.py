@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Bridge Builder component implementation.
+
+This module implements the `BridgeBuilderImpl`, responsible for generating
+hypotheses by finding latent bridges in the knowledge graph.
+"""
+
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, cast
@@ -68,7 +75,7 @@ class BridgeBuilderImpl:
             excluded_targets: Optional list of target symbols to exclude from consideration.
 
         Returns:
-            A BridgeResult containing the hypothesis (if found) and metadata about the process.
+            BridgeResult: A BridgeResult containing the hypothesis (if found) and metadata about the process.
         """
         logger.info(f"Attempting to build bridge for gap: {gap.description}")
         if excluded_targets:

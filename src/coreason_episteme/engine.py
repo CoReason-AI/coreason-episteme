@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Core Engine module for coreason-episteme.
+
+This module contains the `EpistemeEngine` class, which orchestrates the
+primary "Scan-Bridge-Simulate-Critique" workflow loop.
+"""
+
 from dataclasses import dataclass, field
 from typing import List
 
@@ -30,14 +37,15 @@ class EpistemeEngine:
     The Hypothesis Engine (Theorist).
 
     Orchestrates the Scan-Bridge-Simulate-Critique loop to generate and validate
-    scientific hypotheses.
+    scientific hypotheses. It manages the lifecycle of hypothesis generation,
+    from identifying gaps to refining candidates based on adversarial feedback.
 
     Attributes:
-        gap_scanner: Component to identify knowledge gaps.
-        bridge_builder: Component to propose hypotheses bridging gaps.
-        causal_validator: Component to simulate and validate mechanisms.
-        adversarial_reviewer: Component to critique hypotheses.
-        protocol_designer: Component to design validation experiments.
+        gap_scanner: Component to identify knowledge gaps (Negative Space Analysis).
+        bridge_builder: Component to propose hypotheses bridging gaps (Latent Bridging).
+        causal_validator: Component to simulate and validate mechanisms (Causal Simulation).
+        adversarial_reviewer: Component to critique hypotheses (Adversarial Review).
+        protocol_designer: Component to design validation experiments (Protocol Design).
         veritas_client: Client for logging provenance traces.
         max_retries: Maximum number of refinement attempts for a single gap.
     """
@@ -55,19 +63,20 @@ class EpistemeEngine:
         Executes the hypothesis generation pipeline for a given disease ID.
 
         Pipeline Steps:
-        1. Scan for Knowledge Gaps (GapScanner).
-        2. Generate Hypotheses (BridgeBuilder).
-        3. Validate via Causal Simulation (CausalValidator).
-        4. Adversarial Review (AdversarialReviewer).
-        5. Refinement Loop: If FATAL critiques exist, exclude the target and retry (up to max_retries).
-        6. Protocol Design (ProtocolDesigner).
-        7. Logging and Provenance (VeritasClient).
+        1. **Gap Scanning:** Identify disconnected clusters or literature inconsistencies.
+        2. **Refinement Loop:** For each gap:
+            a. **Latent Bridging:** Propose a target/mechanism to bridge the gap.
+            b. **Causal Simulation:** Validate the mechanism via counterfactuals.
+            c. **Adversarial Review:** Critique the hypothesis (Toxicology, IP, etc.).
+            d. **Refinement:** If FATAL critiques occur, exclude the target and retry (up to max_retries).
+            e. **Protocol Design:** Design a PICO experiment for successful hypotheses.
+        3. **Provenance:** Log the full trace of the generation process via Veritas.
 
         Args:
             disease_id: The identifier of the disease or condition to investigate.
 
         Returns:
-            A list of validated and critiqued Hypothesis objects.
+            List[Hypothesis]: A list of validated and critiqued Hypothesis objects.
         """
         logger.info(f"Starting Episteme Engine for: {disease_id}")
         results: List[Hypothesis] = []

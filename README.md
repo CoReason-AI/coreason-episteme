@@ -2,9 +2,10 @@
 
 **Theorist / Hypothesis Engine**
 
-[![License: Prosperity 3.0](https://img.shields.io/badge/License-Prosperity%203.0-blue)](https://github.com/CoReason-AI/coreason_episteme/blob/main/LICENSE)
-[![CI/CD](https://github.com/CoReason-AI/coreason_episteme/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/CoReason-AI/coreason_episteme/actions/workflows/ci-cd.yml)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/CoReason-AI/coreason_episteme)
+[![License: Prosperity 3.0](https://img.shields.io/badge/license-Prosperity%203.0-blue)](https://github.com/CoReason-AI/coreason_episteme/blob/main/LICENSE)
+[![CI/Status](https://github.com/CoReason-AI/coreason_episteme/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/CoReason-AI/coreason_episteme/actions/workflows/ci-cd.yml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Docs](https://img.shields.io/badge/docs-product__requirements-blue)](docs/product_requirements.md)
 
 ## Overview
 
@@ -18,7 +19,7 @@ Crucially, it implements a **"Null Hypothesis First"** architecture. Every gener
 
 1.  **Gap Scanning (Negative Space Analysis):** Identifies disconnected clusters in the Knowledge Graph that share high semantic similarity but lack connections.
 2.  **Latent Bridging (The Leap):** Finds "Latent Bridges"—genes or proteins that are structurally or functionally connected to the conflict but rarely mentioned in the context of the specific disease.
-3.  **Causal Simulation (The Test):** Runs a counterfactual simulation using `coreason-inference` to validatethe hypothesis.
+3.  **Causal Simulation (The Test):** Runs a counterfactual simulation using `coreason-inference` to validate the hypothesis.
 4.  **Adversarial Review (The Council):** Convenes a virtual "Review Board" (The Toxicologist, The Clinician, The IP Strategist) to attack the hypothesis for safety risks, clinical redundancy, or patent infringement.
 
 ## Installation
@@ -35,65 +36,64 @@ pip install coreason-episteme
 *   **Protocol Designer:** Designs the "Killer Experiment" (PICO) to prove or disprove the hypothesis in a wet lab.
 *   **Adversarial Reviewer:** Critiques hypotheses using multi-perspective strategies (Toxicology, IP, Clinical, Scientific Skeptic).
 
+For detailed requirements, see [Product Requirements](docs/product_requirements.md).
+
 ## Usage
 
 ```python
-import logging
-from typing import List, Optional
-
-# Import coreason-episteme entry point and models
+from typing import Any, Dict, List, Optional
 from coreason_episteme.main import generate_hypothesis
-from coreason_episteme.models import Hypothesis
+from coreason_episteme.models import GeneticTarget, KnowledgeGap
 
-# Import or Mock external clients (Protocol interfaces)
-from coreason_episteme.interfaces import (
-    GraphNexusClient, CodexClient, SearchClient,
-    PrismClient, InferenceClient, VeritasClient
-)
+# 1. Define Mock Clients (Simulate external services)
+class MockClient:
+    def find_disconnected_clusters(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
+        return [{"cluster_a_id": "C1", "cluster_b_id": "C2", "cluster_a_name": "A", "cluster_b_name": "B"}]
 
-# NOTE: In a real application, you would instantiate concrete clients
-# that connect to the respective microservices.
-class MockGraphClient:
-    def find_disconnected_clusters(self, criteria): return []
-    def find_latent_bridges(self, source, target): return []
+    def find_latent_bridges(self, source: str, target: str) -> List[GeneticTarget]:
+        return [GeneticTarget(symbol="GENE_X", ensembl_id="ENSG001", druggability_score=0.9, novelty_score=0.8)]
 
-# ... Instantiate other clients similarly ...
+    def get_semantic_similarity(self, e1: str, e2: str) -> float: return 0.95
+    def validate_target(self, symbol: str) -> Optional[GeneticTarget]:
+        return GeneticTarget(symbol=symbol, ensembl_id="ENSG001", druggability_score=0.9, novelty_score=0.8)
 
-def main():
-    # Instantiate clients (replace Mocks with real implementations)
-    graph_client = MockGraphClient() # type: ignore
-    codex_client = ... # Instantiate CodexClient
-    search_client = ... # Instantiate SearchClient
-    prism_client = ... # Instantiate PrismClient
-    inference_client = ... # Instantiate InferenceClient
-    veritas_client = ... # Instantiate VeritasClient
+    def find_literature_inconsistency(self, topic: str) -> List[KnowledgeGap]: return []
+    def verify_citation(self, claim: str) -> bool: return True
+    def check_patent_infringement(self, target: GeneticTarget, mech: str) -> List[str]: return []
+    def find_disconfirming_evidence(self, sub: str, obj: str, act: str) -> List[str]: return []
 
-    disease_id = "DOID:12345" # Example Disease ID
+    def check_druggability(self, target_id: str) -> float: return 0.9
 
-    try:
-        hypotheses: List[Hypothesis] = generate_hypothesis(
-            disease_id=disease_id,
-            graph_client=graph_client,
-            codex_client=codex_client, # type: ignore
-            search_client=search_client, # type: ignore
-            prism_client=prism_client, # type: ignore
-            inference_client=inference_client, # type: ignore
-            veritas_client=veritas_client # type: ignore
-        )
+    def run_counterfactual_simulation(self, mech: str, target: str) -> float: return 0.85
+    def run_toxicology_screen(self, target: GeneticTarget) -> List[str]: return []
+    def check_clinical_redundancy(self, mech: str, target: GeneticTarget) -> List[str]: return []
 
-        for h in hypotheses:
-            print(f"Hypothesis: {h.title}")
-            print(f"Mechanism: {h.proposed_mechanism}")
-            print(f"Confidence: {h.confidence}")
+    def log_trace(self, h_id: str, trace: Dict[str, Any]) -> None: print(f"Logged trace for {h_id}")
 
-    except Exception as e:
-        print(f"Error generating hypotheses: {e}")
+# 2. Instantiate Clients
+mock_client = MockClient()
 
-if __name__ == "__main__":
-    main()
+# 3. Run the Engine
+try:
+    hypotheses = generate_hypothesis(
+        disease_id="DOID:12345",
+        graph_client=mock_client,      # type: ignore
+        codex_client=mock_client,      # type: ignore
+        search_client=mock_client,     # type: ignore
+        prism_client=mock_client,      # type: ignore
+        inference_client=mock_client,  # type: ignore
+        veritas_client=mock_client     # type: ignore
+    )
+
+    for h in hypotheses:
+        print(f"Hypothesis: {h.title}")
+        print(f"Mechanism: {h.proposed_mechanism}")
+        print(f"Confidence: {h.confidence}")
+
+except Exception as e:
+    print(f"Error generating hypotheses: {e}")
 ```
 
 ## License
 
 This project is licensed under the **Prosperity Public License 3.0**.
-See [LICENSE](LICENSE) for more details.

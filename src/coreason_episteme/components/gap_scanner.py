@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Gap Scanner component implementation.
+
+This module implements the `GapScannerImpl`, responsible for identifying
+knowledge gaps (Negative Space Analysis) in the Knowledge Graph.
+"""
+
 from dataclasses import dataclass, field
 from typing import List
 
@@ -51,7 +58,7 @@ class GapScannerImpl:
             target: The disease or biological entity to scan for.
 
         Returns:
-            A list of KnowledgeGap objects representing identified gaps.
+            List[KnowledgeGap]: A list of KnowledgeGap objects representing identified gaps.
         """
         logger.info(f"Scanning for knowledge gaps related to {target}...")
         gaps: List[KnowledgeGap] = []

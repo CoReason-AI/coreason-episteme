@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Main entry point for the coreason-episteme hypothesis engine.
+
+This module provides the high-level API for generating scientific hypotheses,
+orchestrating the injection of dependencies and the execution of the EpistemeEngine.
+"""
+
 from typing import List, Optional
 
 from coreason_episteme.components.adversarial_reviewer import AdversarialReviewerImpl
@@ -37,7 +44,12 @@ from coreason_episteme.utils.logger import logger
 
 
 def hello_world() -> str:
-    """Returns a hello world string."""
+    """
+    Returns a hello world string.
+
+    Returns:
+        str: The string "Hello World!".
+    """
     logger.info("Hello World!")
     return "Hello World!"
 
@@ -55,24 +67,26 @@ def generate_hypothesis(
     Main entry point for generating scientific hypotheses for a given disease.
 
     This function orchestrates the entire "Scan-Bridge-Simulate-Critique" loop by:
-    1. Initializing core components (GapScanner, BridgeBuilder, etc.).
-    2. Injecting required external dependencies (clients).
-    3. Running the EpistemeEngine.
+    1. Validating and injecting required external dependencies (clients).
+    2. Initializing core components (GapScanner, BridgeBuilder, CausalValidator,
+       AdversarialReviewer, ProtocolDesigner).
+    3. Configuring the EpistemeEngine with these components.
+    4. executing the engine's run loop.
 
     Args:
-        disease_id: The identifier of the disease to investigate.
-        graph_client: Client for GraphNexus (Traversals).
-        codex_client: Client for Codex (Ontology/Similarity).
-        search_client: Client for Search (Literature/Patents).
-        prism_client: Client for Prism (Druggability).
-        inference_client: Client for Inference (Simulation/Toxicity).
+        disease_id: The identifier of the disease or condition to investigate (e.g., DOID:12345).
+        graph_client: Client for GraphNexus (Traversals and Gap Analysis).
+        codex_client: Client for Codex (Ontology and Similarity).
+        search_client: Client for Search (Literature, Patents, and Verification).
+        prism_client: Client for Prism (Druggability Assessment).
+        inference_client: Client for Inference (Causal Simulation and Toxicity).
         veritas_client: Client for Veritas (Provenance Logging).
 
     Returns:
-        A list of generated and validated Hypothesis objects.
+        List[Hypothesis]: A list of generated, validated, and critiqued Hypothesis objects.
 
     Raises:
-        RuntimeError: If any required client is not provided.
+        RuntimeError: If any of the required external clients are not provided.
     """
     logger.info(f"Request received: generate_hypothesis for {disease_id}")
 
