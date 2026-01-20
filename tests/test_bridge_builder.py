@@ -23,27 +23,27 @@ from coreason_episteme.models import (
 )
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_graph_client() -> MagicMock:
     return MagicMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_prism_client() -> MagicMock:
     return MagicMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_codex_client() -> MagicMock:
     return MagicMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_search_client() -> MagicMock:
     return MagicMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def bridge_builder(
     mock_graph_client: MagicMock,
     mock_prism_client: MagicMock,

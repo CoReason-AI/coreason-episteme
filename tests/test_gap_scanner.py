@@ -45,22 +45,22 @@ def test_mock_gap_scanner_scan_not_found() -> None:
 # --- GapScannerImpl Tests ---
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_graph_client() -> MagicMock:
     return MagicMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_codex_client() -> MagicMock:
     return MagicMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_search_client() -> MagicMock:
     return MagicMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def gap_scanner_impl(
     mock_graph_client: MagicMock,
     mock_codex_client: MagicMock,

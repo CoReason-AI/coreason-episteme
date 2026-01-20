@@ -22,17 +22,17 @@ from coreason_episteme.models import (
 )
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_inference_client() -> MagicMock:
     return MagicMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_search_client() -> MagicMock:
     return MagicMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def adversarial_reviewer(mock_inference_client: MagicMock, mock_search_client: MagicMock) -> AdversarialReviewerImpl:
     return AdversarialReviewerImpl(
         inference_client=mock_inference_client,
@@ -40,7 +40,7 @@ def adversarial_reviewer(mock_inference_client: MagicMock, mock_search_client: M
     )
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def sample_hypothesis() -> Hypothesis:
     target = GeneticTarget(
         symbol="GeneA",
