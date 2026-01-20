@@ -12,7 +12,7 @@ from typing import List, Optional, cast
 
 import pytest
 
-from coreason_episteme.engine import EpistemeEngine
+from coreason_episteme.engine import EpistemeEngineAsync
 from coreason_episteme.models import BridgeResult, KnowledgeGap
 from tests.mocks import (
     MockAdversarialReviewer,
@@ -25,8 +25,8 @@ from tests.mocks import (
 
 
 @pytest.fixture
-def engine() -> EpistemeEngine:
-    return EpistemeEngine(
+def engine() -> EpistemeEngineAsync:
+    return EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=MockBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -36,9 +36,11 @@ def engine() -> EpistemeEngine:
     )
 
 
-def test_engine_run_happy_path(engine: EpistemeEngine) -> None:
+@pytest.mark.asyncio
+async def test_engine_run_happy_path(engine: EpistemeEngineAsync) -> None:
     """Test the full engine loop with a valid target."""
-    results = engine.run("TargetX")
+    async with engine:
+        results = await engine.run("TargetX")
 
     assert len(results) == 1
     hypothesis = results[0]
@@ -63,23 +65,28 @@ def test_engine_run_happy_path(engine: EpistemeEngine) -> None:
     assert trace["bridge_id"] is not None
 
 
-def test_engine_run_no_gaps(engine: EpistemeEngine) -> None:
+@pytest.mark.asyncio
+async def test_engine_run_no_gaps(engine: EpistemeEngineAsync) -> None:
     """Test engine when no gaps are found."""
-    results = engine.run("CleanTarget")  # Mock returns [] for "CleanTarget"
+    async with engine:
+        results = await engine.run("CleanTarget")  # Mock returns [] for "CleanTarget"
     assert len(results) == 0
 
 
-def test_engine_run_low_causal_score(engine: EpistemeEngine) -> None:
+@pytest.mark.asyncio
+async def test_engine_run_low_causal_score(engine: EpistemeEngineAsync) -> None:
     """Test that hypotheses with low causal scores are filtered out."""
 
     class BadTargetBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
-            result = super().generate_hypothesis(gap, excluded_targets)
+        async def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> BridgeResult:
+            result = await super().generate_hypothesis(gap, excluded_targets)
             if result.hypothesis:
                 result.hypothesis.target_candidate.symbol = "BadTarget"
             return result
 
-    bad_engine = EpistemeEngine(
+    bad_engine = EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=BadTargetBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -88,7 +95,8 @@ def test_engine_run_low_causal_score(engine: EpistemeEngine) -> None:
         veritas_client=MockVeritasClient(),
     )
 
-    results = bad_engine.run("TargetX")
+    async with bad_engine:
+        results = await bad_engine.run("TargetX")
     # Should be filtered out because score will be 0.1 < 0.5
     assert len(results) == 0
 
@@ -102,7 +110,8 @@ def test_engine_run_low_causal_score(engine: EpistemeEngine) -> None:
     assert trace["bridge_id"] is not None
 
 
-def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
+@pytest.mark.asyncio
+async def test_engine_run_refinement_loop(engine: EpistemeEngineAsync) -> None:
     """
     Test the Refinement Loop:
     1. First candidate is 'RiskyTarget' -> Triggers FATAL critique.
@@ -111,8 +120,10 @@ def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
     """
 
     class RefinementBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
-            result = super().generate_hypothesis(gap, excluded_targets)
+        async def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> BridgeResult:
+            result = await super().generate_hypothesis(gap, excluded_targets)
 
             # If RiskyTarget is NOT excluded, return it first
             if not excluded_targets or "RiskyTarget" not in excluded_targets:
@@ -125,7 +136,7 @@ def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
                 result.hypothesis.target_candidate.symbol = "SafeTarget"
             return result
 
-    refinement_engine = EpistemeEngine(
+    refinement_engine = EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=RefinementBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -134,7 +145,8 @@ def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
         veritas_client=MockVeritasClient(),
     )
 
-    results = refinement_engine.run("TargetX")
+    async with refinement_engine:
+        results = await refinement_engine.run("TargetX")
 
     # Should succeed eventually
     assert len(results) == 1
@@ -154,14 +166,17 @@ def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
     assert trace["refinement_retries"] > 0
 
 
-def test_engine_run_bridge_failure(engine: EpistemeEngine) -> None:
+@pytest.mark.asyncio
+async def test_engine_run_bridge_failure(engine: EpistemeEngineAsync) -> None:
     """Test engine when bridge builder fails to generate a hypothesis."""
 
     class BrokenBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+        async def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> BridgeResult:
             return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
-    broken_engine = EpistemeEngine(
+    broken_engine = EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=BrokenBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -170,7 +185,8 @@ def test_engine_run_bridge_failure(engine: EpistemeEngine) -> None:
         veritas_client=MockVeritasClient(),
     )
 
-    results = broken_engine.run("TargetX")
+    async with broken_engine:
+        results = await broken_engine.run("TargetX")
     assert len(results) == 0
 
     # Verify Trace

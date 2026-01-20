@@ -13,7 +13,7 @@ from typing import List, Optional
 
 import pytest
 
-from coreason_episteme.engine import EpistemeEngine
+from coreason_episteme.engine import EpistemeEngineAsync
 from coreason_episteme.models import (
     PICO,
     BridgeResult,
@@ -36,8 +36,8 @@ from tests.mocks import (
 
 
 @pytest.fixture
-def engine() -> EpistemeEngine:
-    return EpistemeEngine(
+def engine() -> EpistemeEngineAsync:
+    return EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=MockBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -47,14 +47,17 @@ def engine() -> EpistemeEngine:
     )
 
 
-def test_refinement_max_retries_exceeded() -> None:
+@pytest.mark.asyncio
+async def test_refinement_max_retries_exceeded() -> None:
     """
     Edge Case: The system keeps finding toxic targets until max_retries is hit.
     Result: Should return empty list (failed to find safe hypothesis).
     """
 
     class InfiniteToxicBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+        async def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> BridgeResult:
             # Always return a new Toxic target
             unique_id = uuid.uuid4().hex[:6]
             hyp = Hypothesis(
@@ -78,7 +81,7 @@ def test_refinement_max_retries_exceeded() -> None:
                 hypothesis=hyp, bridges_found_count=1, considered_candidates=[hyp.target_candidate.symbol]
             )
 
-    engine = EpistemeEngine(
+    engine = EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=InfiniteToxicBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -87,18 +90,22 @@ def test_refinement_max_retries_exceeded() -> None:
         veritas_client=MockVeritasClient(),
     )
 
-    results = engine.run("TargetX")
+    async with engine:
+        results = await engine.run("TargetX")
     assert len(results) == 0
 
 
-def test_refinement_candidate_exhaustion() -> None:
+@pytest.mark.asyncio
+async def test_refinement_candidate_exhaustion() -> None:
     """
     Edge Case: BridgeBuilder runs out of candidates before max_retries.
     Result: Should return empty list.
     """
 
     class ExhaustibleBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+        async def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> BridgeResult:
             # If any target is excluded, assume we ran out of options
             if excluded_targets:
                 return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
@@ -125,7 +132,7 @@ def test_refinement_candidate_exhaustion() -> None:
                 hypothesis=hyp, bridges_found_count=1, considered_candidates=[hyp.target_candidate.symbol]
             )
 
-    engine = EpistemeEngine(
+    engine = EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=ExhaustibleBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -134,11 +141,13 @@ def test_refinement_candidate_exhaustion() -> None:
         veritas_client=MockVeritasClient(),
     )
 
-    results = engine.run("TargetX")
+    async with engine:
+        results = await engine.run("TargetX")
     assert len(results) == 0
 
 
-def test_complex_severity_threshold() -> None:
+@pytest.mark.asyncio
+async def test_complex_severity_threshold() -> None:
     """
     Complex Scenario: "The Unicorn Hunt"
     1. Candidate A -> Toxic (FATAL) -> Refine
@@ -147,7 +156,9 @@ def test_complex_severity_threshold() -> None:
     """
 
     class UnicornBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+        async def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> BridgeResult:
             excluded = excluded_targets or []
 
             # 1. Toxic
@@ -177,7 +188,7 @@ def test_complex_severity_threshold() -> None:
             return BridgeResult(hypothesis=hyp, bridges_found_count=1, considered_candidates=[target.symbol])
 
     class ComplexReviewer(MockAdversarialReviewer):
-        def review(self, hypothesis: Hypothesis) -> Hypothesis:
+        async def review(self, hypothesis: Hypothesis) -> Hypothesis:
             symbol = hypothesis.target_candidate.symbol
             if symbol == "ToxicGene":
                 hypothesis.critiques.append(
@@ -193,7 +204,7 @@ def test_complex_severity_threshold() -> None:
                 )
             return hypothesis
 
-    engine = EpistemeEngine(
+    engine = EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=UnicornBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -202,7 +213,8 @@ def test_complex_severity_threshold() -> None:
         veritas_client=MockVeritasClient(),
     )
 
-    results = engine.run("TargetX")
+    async with engine:
+        results = await engine.run("TargetX")
 
     # Should accept the 3rd one
     assert len(results) == 1
@@ -214,7 +226,8 @@ def test_complex_severity_threshold() -> None:
     assert not any(c.severity == CritiqueSeverity.FATAL for c in winner.critiques)
 
 
-def test_multi_gap_mixed_outcomes() -> None:
+@pytest.mark.asyncio
+async def test_multi_gap_mixed_outcomes() -> None:
     """
     Scenario: The GapScanner returns 3 gaps.
     1. Gap A -> Bridge Found -> Valid -> Accepted.
@@ -225,7 +238,7 @@ def test_multi_gap_mixed_outcomes() -> None:
     """
 
     class MultiGapScanner(MockGapScanner):
-        def scan(self, target: str) -> List[KnowledgeGap]:
+        async def scan(self, target: str) -> List[KnowledgeGap]:
             return [
                 KnowledgeGap(description="Gap A", type=KnowledgeGapType.CLUSTER_DISCONNECT, source_nodes=["A1", "A2"]),
                 KnowledgeGap(description="Gap B", type=KnowledgeGapType.CLUSTER_DISCONNECT, source_nodes=["B1", "B2"]),
@@ -233,7 +246,9 @@ def test_multi_gap_mixed_outcomes() -> None:
             ]
 
     class MultiScenarioBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+        async def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> BridgeResult:
             if gap.description == "Gap A":
                 # Success case
                 hyp = Hypothesis(
@@ -278,7 +293,7 @@ def test_multi_gap_mixed_outcomes() -> None:
             return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
     class ContextAwareValidator(MockCausalValidator):
-        def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+        async def validate(self, hypothesis: Hypothesis) -> Hypothesis:
             if hypothesis.target_candidate.symbol == "GeneC":
                 hypothesis.causal_validation_score = 0.2
             else:
@@ -287,7 +302,7 @@ def test_multi_gap_mixed_outcomes() -> None:
 
     veritas = MockVeritasClient()
 
-    engine = EpistemeEngine(
+    engine = EpistemeEngineAsync(
         gap_scanner=MultiGapScanner(),
         bridge_builder=MultiScenarioBridgeBuilder(),
         causal_validator=ContextAwareValidator(),
@@ -296,7 +311,8 @@ def test_multi_gap_mixed_outcomes() -> None:
         veritas_client=veritas,
     )
 
-    results = engine.run("DiseaseX")
+    async with engine:
+        results = await engine.run("DiseaseX")
 
     # Verify Results (Only 1 accepted)
     assert len(results) == 1
@@ -325,7 +341,8 @@ def test_multi_gap_mixed_outcomes() -> None:
     assert traces[2]["id"] == "hyp-C"
 
 
-def test_deep_refinement_history_logging() -> None:
+@pytest.mark.asyncio
+async def test_deep_refinement_history_logging() -> None:
     """
     Scenario:
     1. Candidate 1 (GeneX) -> FATAL Critique.
@@ -339,7 +356,9 @@ def test_deep_refinement_history_logging() -> None:
     """
 
     class RetryingBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+        async def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> BridgeResult:
             excluded = excluded_targets or []
             candidates = ["GeneX", "GeneY", "GeneZ"]
 
@@ -365,7 +384,7 @@ def test_deep_refinement_history_logging() -> None:
             return BridgeResult(hypothesis=None, bridges_found_count=3, considered_candidates=candidates)
 
     class StrictReviewer(MockAdversarialReviewer):
-        def review(self, hypothesis: Hypothesis) -> Hypothesis:
+        async def review(self, hypothesis: Hypothesis) -> Hypothesis:
             sym = hypothesis.target_candidate.symbol
             if sym in ["GeneX", "GeneY"]:
                 hypothesis.critiques.append(
@@ -375,7 +394,7 @@ def test_deep_refinement_history_logging() -> None:
 
     veritas = MockVeritasClient()
 
-    engine = EpistemeEngine(
+    engine = EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=RetryingBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -384,7 +403,8 @@ def test_deep_refinement_history_logging() -> None:
         veritas_client=veritas,
     )
 
-    results = engine.run("DiseaseY")
+    async with engine:
+        results = await engine.run("DiseaseY")
 
     assert len(results) == 1
     assert results[0].target_candidate.symbol == "GeneZ"

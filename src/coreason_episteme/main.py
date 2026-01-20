@@ -15,7 +15,11 @@ This module provides the high-level API for generating scientific hypotheses,
 orchestrating the injection of dependencies and the execution of the EpistemeEngine.
 """
 
-from typing import List, Optional
+from types import TracebackType
+from typing import Any, List, Optional, Type, cast
+
+import anyio
+import httpx
 
 from coreason_episteme.components.adversarial_reviewer import AdversarialReviewerImpl
 from coreason_episteme.components.bridge_builder import BridgeBuilderImpl
@@ -30,7 +34,7 @@ from coreason_episteme.components.review_strategies import (
 )
 from coreason_episteme.components.strategies import ReviewStrategy
 from coreason_episteme.config import settings
-from coreason_episteme.engine import EpistemeEngine
+from coreason_episteme.engine import EpistemeEngineAsync
 from coreason_episteme.interfaces import (
     CodexClient,
     GraphNexusClient,
@@ -54,6 +58,127 @@ def hello_world() -> str:
     return "Hello World!"
 
 
+class EpistemeAsync:
+    """
+    Async-Native Episteme Service.
+
+    The core service responsible for generating scientific hypotheses asynchronously.
+    """
+
+    def __init__(
+        self,
+        graph_client: GraphNexusClient,
+        codex_client: CodexClient,
+        search_client: SearchClient,
+        prism_client: PrismClient,
+        inference_client: InferenceClient,
+        veritas_client: VeritasClient,
+        client: Optional[httpx.AsyncClient] = None,
+    ):
+        self._internal_client = client is None
+        self._client = client or httpx.AsyncClient()
+
+        # Initialize Components
+        gap_scanner = GapScannerImpl(
+            graph_client=graph_client,
+            codex_client=codex_client,
+            search_client=search_client,
+            similarity_threshold=settings.GAP_SCANNER_SIMILARITY_THRESHOLD,
+        )
+
+        bridge_builder = BridgeBuilderImpl(
+            graph_client=graph_client,
+            prism_client=prism_client,
+            codex_client=codex_client,
+            search_client=search_client,
+            druggability_threshold=settings.DRUGGABILITY_THRESHOLD,
+        )
+
+        causal_validator = CausalValidatorImpl(
+            inference_client=inference_client,
+        )
+
+        strategies: List[ReviewStrategy] = [
+            ToxicologyStrategy(inference_client=inference_client),
+            ClinicalRedundancyStrategy(inference_client=inference_client),
+            PatentStrategy(search_client=search_client),
+            ScientificSkepticStrategy(search_client=search_client),
+        ]
+
+        adversarial_reviewer = AdversarialReviewerImpl(
+            strategies=strategies,
+        )
+
+        protocol_designer = ProtocolDesignerImpl()
+
+        self.engine = EpistemeEngineAsync(
+            gap_scanner=gap_scanner,
+            bridge_builder=bridge_builder,
+            causal_validator=causal_validator,
+            adversarial_reviewer=adversarial_reviewer,
+            protocol_designer=protocol_designer,
+            veritas_client=veritas_client,
+            max_retries=settings.MAX_RETRIES,
+        )
+
+    async def __aenter__(self) -> "EpistemeAsync":
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        if self._internal_client:
+            await self._client.aclose()
+        # Ensure engine resources are cleaned up if any
+        await self.engine.__aexit__(exc_type, exc_val, exc_tb)
+
+    async def run(self, disease_id: str) -> List[Hypothesis]:
+        """
+        Executes the hypothesis generation pipeline.
+        """
+        return await self.engine.run(disease_id)
+
+
+class Episteme:
+    """
+    Sync Facade for Episteme Service.
+    """
+
+    def __init__(
+        self,
+        graph_client: GraphNexusClient,
+        codex_client: CodexClient,
+        search_client: SearchClient,
+        prism_client: PrismClient,
+        inference_client: InferenceClient,
+        veritas_client: VeritasClient,
+    ):
+        self._async = EpistemeAsync(
+            graph_client=graph_client,
+            codex_client=codex_client,
+            search_client=search_client,
+            prism_client=prism_client,
+            inference_client=inference_client,
+            veritas_client=veritas_client,
+        )
+
+    def __enter__(self) -> "Episteme":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        anyio.run(self._async.__aexit__, *args)
+
+    def run(self, disease_id: str) -> List[Hypothesis]:
+        """
+        Executes the hypothesis generation pipeline (blocking).
+        """
+        result = anyio.run(self._async.run, disease_id)
+        return cast(List[Hypothesis], result)
+
+
 def generate_hypothesis(
     disease_id: str,
     graph_client: Optional[GraphNexusClient] = None,
@@ -65,28 +190,7 @@ def generate_hypothesis(
 ) -> List[Hypothesis]:
     """
     Main entry point for generating scientific hypotheses for a given disease.
-
-    This function orchestrates the entire "Scan-Bridge-Simulate-Critique" loop by:
-    1. Validating and injecting required external dependencies (clients).
-    2. Initializing core components (GapScanner, BridgeBuilder, CausalValidator,
-       AdversarialReviewer, ProtocolDesigner).
-    3. Configuring the EpistemeEngine with these components.
-    4. executing the engine's run loop.
-
-    Args:
-        disease_id: The identifier of the disease or condition to investigate (e.g., DOID:12345).
-        graph_client: Client for GraphNexus (Traversals and Gap Analysis).
-        codex_client: Client for Codex (Ontology and Similarity).
-        search_client: Client for Search (Literature, Patents, and Verification).
-        prism_client: Client for Prism (Druggability Assessment).
-        inference_client: Client for Inference (Causal Simulation and Toxicity).
-        veritas_client: Client for Veritas (Provenance Logging).
-
-    Returns:
-        List[Hypothesis]: A list of generated, validated, and critiqued Hypothesis objects.
-
-    Raises:
-        RuntimeError: If any of the required external clients are not provided.
+    Uses the Episteme Sync Facade.
     """
     logger.info(f"Request received: generate_hypothesis for {disease_id}")
 
@@ -104,52 +208,12 @@ def generate_hypothesis(
     if veritas_client is None:
         raise RuntimeError("Missing required external client: VeritasClient")
 
-    # Initialize Components (Dependency Injection)
-
-    gap_scanner = GapScannerImpl(
+    with Episteme(
         graph_client=graph_client,
         codex_client=codex_client,
         search_client=search_client,
-        similarity_threshold=settings.GAP_SCANNER_SIMILARITY_THRESHOLD,
-    )
-
-    bridge_builder = BridgeBuilderImpl(
-        graph_client=graph_client,
         prism_client=prism_client,
-        codex_client=codex_client,
-        search_client=search_client,
-        druggability_threshold=settings.DRUGGABILITY_THRESHOLD,
-    )
-
-    causal_validator = CausalValidatorImpl(
         inference_client=inference_client,
-    )
-
-    # Initialize Strategies
-    strategies: List[ReviewStrategy] = [
-        ToxicologyStrategy(inference_client=inference_client),
-        ClinicalRedundancyStrategy(inference_client=inference_client),
-        PatentStrategy(search_client=search_client),
-        ScientificSkepticStrategy(search_client=search_client),
-    ]
-
-    adversarial_reviewer = AdversarialReviewerImpl(
-        strategies=strategies,
-    )
-
-    protocol_designer = ProtocolDesignerImpl()
-
-    # Initialize Engine
-    engine = EpistemeEngine(
-        gap_scanner=gap_scanner,
-        bridge_builder=bridge_builder,
-        causal_validator=causal_validator,
-        adversarial_reviewer=adversarial_reviewer,
-        protocol_designer=protocol_designer,
         veritas_client=veritas_client,
-        max_retries=settings.MAX_RETRIES,
-    )
-
-    # Run
-    results: List[Hypothesis] = engine.run(disease_id)
-    return results
+    ) as service:
+        return service.run(disease_id)

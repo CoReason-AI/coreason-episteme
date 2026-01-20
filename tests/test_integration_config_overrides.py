@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -30,21 +30,22 @@ class TestIntegrationConfigOverrides:
 
     @pytest.fixture
     def mock_graph_client(self) -> Mock:
-        return Mock(spec=GraphNexusClient)
+        return AsyncMock(spec=GraphNexusClient)
 
     @pytest.fixture
     def mock_codex_client(self) -> Mock:
-        return Mock(spec=CodexClient)
+        return AsyncMock(spec=CodexClient)
 
     @pytest.fixture
     def mock_search_client(self) -> Mock:
-        return Mock(spec=SearchClient)
+        return AsyncMock(spec=SearchClient)
 
     @pytest.fixture
     def mock_prism_client(self) -> Mock:
-        return Mock(spec=PrismClient)
+        return AsyncMock(spec=PrismClient)
 
-    def test_gap_scanner_similarity_threshold_override(
+    @pytest.mark.asyncio
+    async def test_gap_scanner_similarity_threshold_override(
         self,
         mock_graph_client: Mock,
         mock_codex_client: Mock,
@@ -75,7 +76,7 @@ class TestIntegrationConfigOverrides:
             search_client=mock_search_client,
             similarity_threshold=0.75,
         )
-        gaps_strict = scanner_strict.scan("DiseaseX")
+        gaps_strict = await scanner_strict.scan("DiseaseX")
         assert len(gaps_strict) == 0
 
         # Case 2: Lowered Threshold (0.5) -> Should find 1 gap (0.6 >= 0.5)
@@ -85,11 +86,12 @@ class TestIntegrationConfigOverrides:
             search_client=mock_search_client,
             similarity_threshold=0.5,
         )
-        gaps_lax = scanner_lax.scan("DiseaseX")
+        gaps_lax = await scanner_lax.scan("DiseaseX")
         assert len(gaps_lax) == 1
         assert gaps_lax[0].type == KnowledgeGapType.CLUSTER_DISCONNECT
 
-    def test_bridge_builder_druggability_threshold_override(
+    @pytest.mark.asyncio
+    async def test_bridge_builder_druggability_threshold_override(
         self,
         mock_graph_client: Mock,
         mock_prism_client: Mock,
@@ -128,7 +130,7 @@ class TestIntegrationConfigOverrides:
             search_client=mock_search_client,
             druggability_threshold=0.5,
         )
-        result_strict = builder_strict.generate_hypothesis(gap)
+        result_strict = await builder_strict.generate_hypothesis(gap)
         assert result_strict.hypothesis is None
         assert result_strict.bridges_found_count == 1  # It found it, but filtered it
 
@@ -140,6 +142,6 @@ class TestIntegrationConfigOverrides:
             search_client=mock_search_client,
             druggability_threshold=0.3,
         )
-        result_lax = builder_lax.generate_hypothesis(gap)
+        result_lax = await builder_lax.generate_hypothesis(gap)
         assert result_lax.hypothesis is not None
         assert result_lax.hypothesis.target_candidate.symbol == candidate_symbol
