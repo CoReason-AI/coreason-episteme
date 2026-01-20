@@ -23,11 +23,20 @@ def _format_critiques(items: List[str], source: str, severity: CritiqueSeverity)
 
 @dataclass
 class ToxicologyStrategy:
-    """The Toxicologist: Checks for safety risks."""
+    """
+    The Toxicologist Strategy.
+
+    Checks for safety risks associated with the proposed target.
+    Critiques are typically fatal if toxicity is high.
+
+    Attributes:
+        inference_client: Client for running toxicology screens.
+    """
 
     inference_client: InferenceClient
 
     def review(self, hypothesis: Hypothesis) -> List[Critique]:
+        """Runs the toxicology screen and returns critiques."""
         logger.debug(f"Running Toxicology Screen for {hypothesis.target_candidate.symbol}...")
         tox_risks = self.inference_client.run_toxicology_screen(hypothesis.target_candidate)
         if tox_risks:
@@ -38,11 +47,20 @@ class ToxicologyStrategy:
 
 @dataclass
 class ClinicalRedundancyStrategy:
-    """The Clinician: Checks for redundancy with existing interventions."""
+    """
+    The Clinician Strategy.
+
+    Checks if the proposed hypothesis is redundant with existing interventions
+    or established clinical knowledge.
+
+    Attributes:
+        inference_client: Client for checking clinical redundancy.
+    """
 
     inference_client: InferenceClient
 
     def review(self, hypothesis: Hypothesis) -> List[Critique]:
+        """Checks for clinical redundancy and returns critiques."""
         logger.debug("Checking Clinical Redundancy...")
         redundancies = self.inference_client.check_clinical_redundancy(
             hypothesis.proposed_mechanism, hypothesis.target_candidate
@@ -55,11 +73,19 @@ class ClinicalRedundancyStrategy:
 
 @dataclass
 class PatentStrategy:
-    """The IP Strategist: Checks for patent infringement."""
+    """
+    The IP Strategist.
+
+    Checks for patent infringement or "Freedom to Operate" issues.
+
+    Attributes:
+        search_client: Client for searching patent databases.
+    """
 
     search_client: SearchClient
 
     def review(self, hypothesis: Hypothesis) -> List[Critique]:
+        """Checks for patent conflicts and returns critiques."""
         logger.debug("Checking Patent Infringement...")
         patents = self.search_client.check_patent_infringement(
             hypothesis.target_candidate, hypothesis.proposed_mechanism
@@ -72,11 +98,19 @@ class PatentStrategy:
 
 @dataclass
 class ScientificSkepticStrategy:
-    """The Scientific Skeptic: Checks for disconfirming evidence (Null Hypothesis)."""
+    """
+    The Scientific Skeptic.
+
+    Checks for evidence that explicitly disconfirms the hypothesis (Null Hypothesis check).
+
+    Attributes:
+        search_client: Client for finding disconfirming evidence in literature.
+    """
 
     search_client: SearchClient
 
     def review(self, hypothesis: Hypothesis) -> List[Critique]:
+        """Searches for disconfirming evidence and returns critiques."""
         logger.debug("Searching for Disconfirming Evidence (Null Hypothesis Check)...")
         # Attempt to parse subject/object from hypothesis or use best-effort mapping
         subject = hypothesis.target_candidate.symbol

@@ -19,7 +19,19 @@ from coreason_episteme.utils.logger import logger
 
 @dataclass
 class GapScannerImpl:
-    """Implementation of the GapScanner (The Void Detector)."""
+    """
+    Implementation of the GapScanner (The Void Detector).
+
+    Identifies "Negative Space" in the Knowledge Graph by finding disconnected
+    clusters that should be connected based on semantic similarity, or by
+    finding explicit inconsistencies in the literature.
+
+    Attributes:
+        graph_client: Client for GraphNexus.
+        codex_client: Client for Codex.
+        search_client: Client for Search.
+        similarity_threshold: Threshold for semantic similarity to consider a disconnect significant.
+    """
 
     graph_client: GraphNexusClient
     codex_client: CodexClient
@@ -30,8 +42,16 @@ class GapScannerImpl:
         """
         Scans for knowledge gaps (Negative Space Analysis).
 
-        1. Cluster Analysis: Finds disconnected subgraphs with high semantic similarity.
-        2. Literature Discrepancy: Finds inconsistencies via Search.
+        Steps:
+        1. Cluster Analysis: Finds disconnected subgraphs in GraphNexus.
+           Checks semantic similarity via Codex.
+        2. Literature Discrepancy: Queries SearchClient for inconsistencies.
+
+        Args:
+            target: The disease or biological entity to scan for.
+
+        Returns:
+            A list of KnowledgeGap objects representing identified gaps.
         """
         logger.info(f"Scanning for knowledge gaps related to {target}...")
         gaps: List[KnowledgeGap] = []

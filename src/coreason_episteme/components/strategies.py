@@ -21,5 +21,11 @@ class ReviewStrategy(Protocol):
     def review(self, hypothesis: Hypothesis) -> List[Critique]:
         """
         Conducts a review of the hypothesis and returns a list of critiques.
+
+        Args:
+            hypothesis: The hypothesis to review.
+
+        Returns:
+            A list of Critique objects identifying potential flaws or risks.
         """
         ...
