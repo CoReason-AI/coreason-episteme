@@ -64,7 +64,7 @@ class EpistemeEngine:
             attempts = 0
 
             # Initialize Trace
-            trace = HypothesisTrace(gap=gap, status="PENDING")
+            trace = HypothesisTrace(gap=gap, gap_id=gap.id, status="PENDING")
 
             while attempts < self.max_retries:
                 attempts += 1
@@ -93,6 +93,8 @@ class EpistemeEngine:
 
                 # Link trace ID to hypothesis ID if available
                 trace.hypothesis_id = hypothesis.id
+                # Use the ensembl_id of the target as the bridge_id
+                trace.bridge_id = hypothesis.target_candidate.ensembl_id
 
                 # 3. Causal Simulation
                 hypothesis = self.causal_validator.validate(hypothesis)
