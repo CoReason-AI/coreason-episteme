@@ -22,12 +22,12 @@ from tests.mocks import (
 )
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_veritas() -> MockVeritasClient:
     return MockVeritasClient()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def engine(mock_veritas: MockVeritasClient) -> EpistemeEngine:
     # Attempt to inject veritas_client - this will fail until EpistemeEngine is updated
     return EpistemeEngine(

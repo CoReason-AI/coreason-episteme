@@ -42,7 +42,7 @@ def test_pico_model_invalid_missing_field() -> None:
             population="Patients",
             intervention="Drug",
             # Missing comparator
-            outcome="Health",  # type: ignore
+            outcome="Health",  # type: ignore[call-arg]
         )
 
 
@@ -72,7 +72,7 @@ def test_knowledge_gap_model_invalid_type() -> None:
     with pytest.raises(ValidationError):
         KnowledgeGap(
             description="Bad Gap",
-            type="UNKNOWN_TYPE",  # type: ignore
+            type="UNKNOWN_TYPE",
         )
 
 
@@ -157,7 +157,7 @@ def test_hypothesis_model_invalid_nested_pico() -> None:
                 "population": "Pop",
                 "intervention": "Int",
                 # Missing comparator and outcome
-            },  # type: ignore
+            },
             evidence_chain=[],
             confidence=ConfidenceLevel.SPECULATIVE,
         )

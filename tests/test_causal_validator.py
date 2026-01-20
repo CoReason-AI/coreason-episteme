@@ -21,12 +21,12 @@ from coreason_episteme.models import (
 )
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def mock_inference_client() -> MagicMock:
     return MagicMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def causal_validator(mock_inference_client: MagicMock) -> CausalValidatorImpl:
     return CausalValidatorImpl(inference_client=mock_inference_client)
 
