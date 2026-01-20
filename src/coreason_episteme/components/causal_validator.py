@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Causal Validator component implementation.
+
+This module implements the `CausalValidatorImpl`, responsible for running
+counterfactual simulations to validate proposed hypotheses.
+"""
+
 from dataclasses import dataclass
 
 from coreason_episteme.interfaces import InferenceClient
@@ -40,7 +47,7 @@ class CausalValidatorImpl:
             hypothesis: The hypothesis to validate.
 
         Returns:
-            The hypothesis object updated with the causal validation score and
+            Hypothesis: The hypothesis object updated with the causal validation score and
             description of the key counterfactual tested.
         """
         logger.info(f"Validating hypothesis: {hypothesis.id}")

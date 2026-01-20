@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Protocol Designer component implementation.
+
+This module implements the `ProtocolDesignerImpl`, responsible for generating
+PICO experimental designs for validated hypotheses.
+"""
+
 from coreason_episteme.models import PICO, Hypothesis
 from coreason_episteme.utils.logger import logger
 
@@ -26,7 +33,7 @@ class ProtocolDesignerImpl:
             hypothesis: The hypothesis to design an experiment for.
 
         Returns:
-            The hypothesis object updated with the experimental design (PICO).
+            Hypothesis: The hypothesis object updated with the experimental design (PICO).
         """
         logger.info(f"Designing experiment for hypothesis: {hypothesis.id}")
 

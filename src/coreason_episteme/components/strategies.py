@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Base strategies module for coreason-episteme.
+
+This module defines the `ReviewStrategy` protocol that all adversarial review
+strategies must implement.
+"""
+
 from typing import List, Protocol
 
 from coreason_episteme.models import Critique, Hypothesis
@@ -26,6 +33,6 @@ class ReviewStrategy(Protocol):
             hypothesis: The hypothesis to review.
 
         Returns:
-            A list of Critique objects identifying potential flaws or risks.
+            List[Critique]: A list of Critique objects identifying potential flaws or risks.
         """
         ...
