@@ -21,7 +21,11 @@ class AdversarialReviewerImpl:
     """
     Implementation of the Adversarial Reviewer (The Council).
 
-    Orchestrates reviews from various strategies.
+    Orchestrates reviews from various strategies to critique the hypothesis
+    from multiple perspectives (Toxicology, Clinical, IP, etc.).
+
+    Attributes:
+        strategies: A list of ReviewStrategy implementations to apply.
     """
 
     strategies: List[ReviewStrategy] = field(default_factory=list)
@@ -29,7 +33,15 @@ class AdversarialReviewerImpl:
     def review(self, hypothesis: Hypothesis) -> Hypothesis:
         """
         Conducts an adversarial review of the hypothesis.
-        Aggregates critiques and appends them to the hypothesis.
+
+        Iterates through all configured strategies, aggregates their critiques,
+        and appends them to the hypothesis.
+
+        Args:
+            hypothesis: The hypothesis to review.
+
+        Returns:
+            The hypothesis object with appended critiques.
         """
         logger.info(f"Convening Review Board for hypothesis: {hypothesis.id}")
 

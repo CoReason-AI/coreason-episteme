@@ -37,6 +37,7 @@ from coreason_episteme.utils.logger import logger
 
 
 def hello_world() -> str:
+    """Returns a hello world string."""
     logger.info("Hello World!")
     return "Hello World!"
 
@@ -51,9 +52,27 @@ def generate_hypothesis(
     veritas_client: Optional[VeritasClient] = None,
 ) -> List[Hypothesis]:
     """
-    Main entry point for generating hypotheses.
+    Main entry point for generating scientific hypotheses for a given disease.
 
-    Requires concrete implementations of all external clients.
+    This function orchestrates the entire "Scan-Bridge-Simulate-Critique" loop by:
+    1. Initializing core components (GapScanner, BridgeBuilder, etc.).
+    2. Injecting required external dependencies (clients).
+    3. Running the EpistemeEngine.
+
+    Args:
+        disease_id: The identifier of the disease to investigate.
+        graph_client: Client for GraphNexus (Traversals).
+        codex_client: Client for Codex (Ontology/Similarity).
+        search_client: Client for Search (Literature/Patents).
+        prism_client: Client for Prism (Druggability).
+        inference_client: Client for Inference (Simulation/Toxicity).
+        veritas_client: Client for Veritas (Provenance Logging).
+
+    Returns:
+        A list of generated and validated Hypothesis objects.
+
+    Raises:
+        RuntimeError: If any required client is not provided.
     """
     logger.info(f"Request received: generate_hypothesis for {disease_id}")
 

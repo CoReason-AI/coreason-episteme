@@ -31,7 +31,19 @@ from coreason_episteme.utils.logger import logger
 
 @dataclass
 class BridgeBuilderImpl:
-    """Implementation of the Bridge Builder (Hypothesis Formulator)."""
+    """
+    Implementation of the Bridge Builder (Hypothesis Formulator).
+
+    Generates hypotheses by finding "Latent Bridges" between disconnected concepts
+    in the Knowledge Graph. It ensures targets are druggable and citation-backed.
+
+    Attributes:
+        graph_client: Client for GraphNexus (Traversals).
+        prism_client: Client for Prism (Druggability).
+        codex_client: Client for Codex (Ontology).
+        search_client: Client for Search (Hallucination Check).
+        druggability_threshold: Minimum score to consider a target druggable.
+    """
 
     graph_client: GraphNexusClient
     prism_client: PrismClient
@@ -43,12 +55,20 @@ class BridgeBuilderImpl:
         """
         Generates a hypothesis bridging the knowledge gap.
 
+        Process:
         1. Queries GraphNexus for latent bridges between source nodes.
-        2. Filters out excluded_targets.
-        3. Filters bridges for druggability via Prism.
-        4. Validates target via Codex.
-        5. Verifies citations via Search (Hallucination Check).
-        6. Constructs a Hypothesis and returns BridgeResult.
+        2. Filters out targets listed in `excluded_targets`.
+        3. Checks druggability using `prism_client`.
+        4. Validates target details using `codex_client`.
+        5. Performs a "Hallucination Check" using `search_client` to verify citations.
+        6. Selects the best candidate (highest druggability) and constructs a Hypothesis.
+
+        Args:
+            gap: The KnowledgeGap to bridge.
+            excluded_targets: Optional list of target symbols to exclude from consideration.
+
+        Returns:
+            A BridgeResult containing the hypothesis (if found) and metadata about the process.
         """
         logger.info(f"Attempting to build bridge for gap: {gap.description}")
         if excluded_targets:

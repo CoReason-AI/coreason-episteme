@@ -17,14 +17,31 @@ from coreason_episteme.utils.logger import logger
 
 @dataclass
 class CausalValidatorImpl:
-    """Implementation of the Causal Validator (The Simulator)."""
+    """
+    Implementation of the Causal Validator (The Simulator).
+
+    Uses `coreason-inference` to run counterfactual simulations on the proposed hypothesis,
+    testing if the mechanism holds up under in-silico stress testing.
+
+    Attributes:
+        inference_client: Client for Inference service.
+    """
 
     inference_client: InferenceClient
 
     def validate(self, hypothesis: Hypothesis) -> Hypothesis:
         """
         Validates the hypothesis using causal simulation.
-        Updates the hypothesis with validation score.
+
+        Runs a counterfactual simulation: "If we inhibit Target Gene [A], does it causally
+        interrupt the disease pathway [C]?".
+
+        Args:
+            hypothesis: The hypothesis to validate.
+
+        Returns:
+            The hypothesis object updated with the causal validation score and
+            description of the key counterfactual tested.
         """
         logger.info(f"Validating hypothesis: {hypothesis.id}")
 
