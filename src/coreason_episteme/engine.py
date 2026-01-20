@@ -64,101 +64,107 @@ class EpistemeEngine:
             attempts = 0
 
             # Initialize Trace
-            trace = HypothesisTrace(gap=gap, status="PENDING")
+            trace = HypothesisTrace(gap=gap, gap_id=gap.id, status="PENDING")
 
-            while attempts < self.max_retries:
-                attempts += 1
-                trace.excluded_targets_history = list(excluded_targets)  # Update history
-                trace.refinement_retries = attempts - 1
+            try:
+                while attempts < self.max_retries:
+                    attempts += 1
+                    trace.excluded_targets_history = list(excluded_targets)  # Update history
+                    trace.refinement_retries = attempts - 1
 
-                logger.info(
-                    f"Attempt {attempts}/{self.max_retries} for gap: {gap.description[:50]}... "
-                    f"(Excluded: {len(excluded_targets)})"
-                )
-
-                # 2. Latent Bridging
-                bridge_result = self.bridge_builder.generate_hypothesis(gap, excluded_targets=excluded_targets)
-
-                # Accumulate bridge metadata
-                trace.bridges_found_count = bridge_result.bridges_found_count
-                trace.considered_candidates = bridge_result.considered_candidates
-
-                hypothesis = bridge_result.hypothesis
-                if not hypothesis:
-                    logger.info("No hypothesis generated for gap.")
-                    trace.status = "DISCARDED (No Bridge)"
-                    # Log trace if failed completely to find a bridge?
-                    # Yes, we should log the attempt even if it failed.
-                    break
-
-                # Link trace ID to hypothesis ID if available
-                trace.hypothesis_id = hypothesis.id
-
-                # 3. Causal Simulation
-                hypothesis = self.causal_validator.validate(hypothesis)
-
-                # Accumulate validation data
-                trace.causal_validation_score = hypothesis.causal_validation_score
-                trace.key_counterfactual = hypothesis.key_counterfactual
-
-                # Filtering Policy: Discard if causal plausibility is too low.
-                if hypothesis.causal_validation_score < 0.5:
                     logger.info(
-                        f"Hypothesis {hypothesis.id} discarded due to low causal score "
-                        f"({hypothesis.causal_validation_score})."
+                        f"Attempt {attempts}/{self.max_retries} for gap: {gap.description[:50]}... "
+                        f"(Excluded: {len(excluded_targets)})"
                     )
-                    trace.status = "DISCARDED (Low Causal Score)"
-                    # We break here, as per original logic, though in a real system we might loop.
-                    # Current logic is: break loop, move to next gap.
-                    break
 
-                # 4. Adversarial Review
-                hypothesis = self.adversarial_reviewer.review(hypothesis)
+                    # 2. Latent Bridging
+                    bridge_result = self.bridge_builder.generate_hypothesis(gap, excluded_targets=excluded_targets)
 
-                # Accumulate critiques
-                trace.critiques = hypothesis.critiques
+                    # Accumulate bridge metadata
+                    trace.bridges_found_count = bridge_result.bridges_found_count
+                    trace.considered_candidates = bridge_result.considered_candidates
 
-                # 5. Refinement Check
-                fatal_critiques = [c for c in hypothesis.critiques if c.severity == CritiqueSeverity.FATAL]
-                if fatal_critiques:
-                    target_symbol = hypothesis.target_candidate.symbol
-                    logger.warning(
-                        f"Hypothesis {hypothesis.id} rejected due to FATAL critiques ({len(fatal_critiques)}). "
-                        f"Refining loop -> Excluding {target_symbol}"
-                    )
-                    excluded_targets.append(target_symbol)
-                    # We loop back. The trace continues.
-                    # We might want to persist the "history" of rejected targets in more detail,
-                    # but `excluded_targets_history` captures the symbols.
-                    continue
-                else:
-                    # Success!
-                    # 6. Protocol Design
-                    hypothesis = self.protocol_designer.design_experiment(hypothesis)
+                    hypothesis = bridge_result.hypothesis
+                    if not hypothesis:
+                        logger.info("No hypothesis generated for gap.")
+                        trace.status = "DISCARDED (No Bridge)"
+                        break
 
-                    trace.result = hypothesis
-                    trace.status = "ACCEPTED"
+                    # Link trace ID to hypothesis ID if available
+                    trace.hypothesis_id = hypothesis.id
+                    # Use the ensembl_id of the target as the bridge_id
+                    trace.bridge_id = hypothesis.target_candidate.ensembl_id
 
-                    # Log the final trace
-                    if trace.hypothesis_id:
-                        self.veritas_client.log_trace(
-                            trace.hypothesis_id,
-                            trace.model_dump(),
+                    # 3. Causal Simulation
+                    hypothesis = self.causal_validator.validate(hypothesis)
+
+                    # Accumulate validation data
+                    trace.causal_validation_score = hypothesis.causal_validation_score
+                    trace.key_counterfactual = hypothesis.key_counterfactual
+
+                    # Filtering Policy: Discard if causal plausibility is too low.
+                    if hypothesis.causal_validation_score < 0.5:
+                        logger.info(
+                            f"Hypothesis {hypothesis.id} discarded due to low causal score "
+                            f"({hypothesis.causal_validation_score})."
                         )
+                        trace.status = "DISCARDED (Low Causal Score)"
+                        break
 
-                    results.append(hypothesis)
-                    break  # Move to next gap
+                    # 4. Adversarial Review
+                    hypothesis = self.adversarial_reviewer.review(hypothesis)
 
-            # If loop exhausted without success or broke early
-            if trace.status != "ACCEPTED":
-                # Log trace for failed attempt if we have an ID
-                # If we never got a hypothesis ID (e.g. no bridges), we generate a UUID or use None
-                # The interface requires hypothesis_id: str.
-                log_id = trace.hypothesis_id or f"failed-gap-{hash(gap.description)}"
+                    # Accumulate critiques
+                    trace.critiques = hypothesis.critiques
+
+                    # 5. Refinement Check
+                    fatal_critiques = [c for c in hypothesis.critiques if c.severity == CritiqueSeverity.FATAL]
+                    if fatal_critiques:
+                        target_symbol = hypothesis.target_candidate.symbol
+                        logger.warning(
+                            f"Hypothesis {hypothesis.id} rejected due to FATAL critiques ({len(fatal_critiques)}). "
+                            f"Refining loop -> Excluding {target_symbol}"
+                        )
+                        excluded_targets.append(target_symbol)
+                        continue
+                    else:
+                        # Success!
+                        # 6. Protocol Design
+                        hypothesis = self.protocol_designer.design_experiment(hypothesis)
+
+                        trace.result = hypothesis
+                        trace.status = "ACCEPTED"
+
+                        # Log the final trace
+                        if trace.hypothesis_id:
+                            self.veritas_client.log_trace(
+                                trace.hypothesis_id,
+                                trace.model_dump(),
+                            )
+
+                        results.append(hypothesis)
+                        break  # Move to next gap
+
+                # If loop exhausted without success or broke early
+                if trace.status != "ACCEPTED":
+                    # Log trace for failed attempt if we have an ID
+                    # If we never got a hypothesis ID (e.g. no bridges), we generate a UUID or use None
+                    # The interface requires hypothesis_id: str.
+                    log_id = trace.hypothesis_id or f"failed-gap-{gap.id}"
+                    self.veritas_client.log_trace(
+                        log_id,
+                        trace.model_dump(),
+                    )
+
+            except Exception as e:
+                logger.exception(f"Error processing gap {gap.description}: {e}")
+                trace.status = f"ERROR: {str(e)}"
+                log_id = trace.hypothesis_id or f"error-gap-{gap.id}"
                 self.veritas_client.log_trace(
                     log_id,
                     trace.model_dump(),
                 )
+                continue
 
         logger.info(f"Engine finished. Generated {len(results)} hypotheses.")
         return results

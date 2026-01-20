@@ -59,6 +59,8 @@ def test_engine_run_happy_path(engine: EpistemeEngine) -> None:
     trace = veritas.traces[0]["data"]
     assert trace["status"] == "ACCEPTED"
     assert trace["bridges_found_count"] == 2
+    assert trace["gap_id"] is not None
+    assert trace["bridge_id"] is not None
 
 
 def test_engine_run_no_gaps(engine: EpistemeEngine) -> None:
@@ -93,7 +95,11 @@ def test_engine_run_low_causal_score(engine: EpistemeEngine) -> None:
     # Verify Trace Logs "DISCARDED"
     veritas = cast(MockVeritasClient, bad_engine.veritas_client)
     assert len(veritas.traces) == 1
-    assert veritas.traces[0]["data"]["status"] == "DISCARDED (Low Causal Score)"
+    trace = veritas.traces[0]["data"]
+    assert trace["status"] == "DISCARDED (Low Causal Score)"
+    assert trace["gap_id"] is not None
+    # bridge_id should be present because hypothesis was generated (but discarded)
+    assert trace["bridge_id"] is not None
 
 
 def test_engine_run_refinement_loop(engine: EpistemeEngine) -> None:
@@ -170,4 +176,8 @@ def test_engine_run_bridge_failure(engine: EpistemeEngine) -> None:
     # Verify Trace
     veritas = cast(MockVeritasClient, broken_engine.veritas_client)
     assert len(veritas.traces) == 1
-    assert veritas.traces[0]["data"]["status"] == "DISCARDED (No Bridge)"
+    trace = veritas.traces[0]["data"]
+    assert trace["status"] == "DISCARDED (No Bridge)"
+    assert trace["gap_id"] is not None
+    # bridge_id might be None if no bridge was found
+    assert trace.get("bridge_id") is None
