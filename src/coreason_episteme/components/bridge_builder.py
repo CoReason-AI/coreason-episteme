@@ -9,8 +9,10 @@
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
 import uuid
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, cast
 
+from coreason_episteme.config import settings
 from coreason_episteme.interfaces import (
     CodexClient,
     GraphNexusClient,
@@ -27,20 +29,15 @@ from coreason_episteme.models import (
 from coreason_episteme.utils.logger import logger
 
 
+@dataclass
 class BridgeBuilderImpl:
     """Implementation of the Bridge Builder (Hypothesis Formulator)."""
 
-    def __init__(
-        self,
-        graph_client: GraphNexusClient,
-        prism_client: PrismClient,
-        codex_client: CodexClient,
-        search_client: SearchClient,
-    ):
-        self.graph_client = graph_client
-        self.prism_client = prism_client
-        self.codex_client = codex_client
-        self.search_client = search_client
+    graph_client: GraphNexusClient
+    prism_client: PrismClient
+    codex_client: CodexClient
+    search_client: SearchClient
+    druggability_threshold: float = field(default_factory=lambda: settings.DRUGGABILITY_THRESHOLD)
 
     def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
         """
@@ -88,7 +85,7 @@ class BridgeBuilderImpl:
 
             # Check druggability
             druggability = self.prism_client.check_druggability(bridge.ensembl_id)
-            if druggability > 0.5:  # Threshold for "druggable"
+            if druggability > self.druggability_threshold:  # Threshold for "druggable"
                 # Validate details with Codex
                 validated_target = self.codex_client.validate_target(bridge.symbol)
                 if validated_target:

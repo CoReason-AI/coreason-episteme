@@ -13,6 +13,8 @@ from pathlib import Path
 
 from loguru import logger
 
+from coreason_episteme.config import settings
+
 __all__ = ["logger"]
 
 # Remove default handler
@@ -21,7 +23,7 @@ logger.remove()
 # Sink 1: Stdout (Human-readable)
 logger.add(
     sys.stderr,
-    level="INFO",
+    level=settings.LOG_LEVEL,
     format=(
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
         "<level>{level: <8}</level> | "
@@ -42,5 +44,5 @@ logger.add(
     retention="10 days",
     serialize=True,
     enqueue=True,
-    level="INFO",
+    level=settings.LOG_LEVEL,
 )
