@@ -82,9 +82,7 @@ class AdversarialReviewerImpl:
         if disconfirming_evidence:
             # We use a slightly different content format for evidence
             formatted_evidence = [f"Disconfirming evidence found: {e}" for e in disconfirming_evidence]
-            critiques.extend(
-                self._format_critiques(formatted_evidence, "Scientific Skeptic", CritiqueSeverity.FATAL)
-            )
+            critiques.extend(self._format_critiques(formatted_evidence, "Scientific Skeptic", CritiqueSeverity.FATAL))
             logger.info(f"Disconfirming evidence found: {len(disconfirming_evidence)}")
 
         # Append to hypothesis
