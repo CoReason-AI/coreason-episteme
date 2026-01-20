@@ -8,6 +8,16 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Logging configuration for the coreason-episteme application.
+
+This module configures the `loguru` logger with two sinks:
+1. Standard Error (Stderr) for human-readable console output.
+2. File sink (`logs/app.log`) for structured JSON logging with rotation and retention.
+
+The log level is determined by the `LOG_LEVEL` setting in `coreason_episteme.config.settings`.
+"""
+
 import sys
 from pathlib import Path
 

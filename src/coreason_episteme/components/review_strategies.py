@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Strategies implementation for the Adversarial Reviewer.
+
+This module contains concrete implementations of the `ReviewStrategy` protocol,
+each representing a different perspective (persona) in the adversarial review process.
+"""
+
 from dataclasses import dataclass
 from typing import List
 
@@ -17,7 +24,17 @@ from coreason_episteme.utils.logger import logger
 
 
 def _format_critiques(items: List[str], source: str, severity: CritiqueSeverity) -> List[Critique]:
-    """Helper to format list of strings into Critique objects."""
+    """
+    Helper to format list of strings into Critique objects.
+
+    Args:
+        items: List of critique content strings.
+        source: The source of the critique (e.g., "The Toxicologist").
+        severity: The severity of the critiques.
+
+    Returns:
+        List[Critique]: A list of Critique objects.
+    """
     return [Critique(source=source, content=item, severity=severity) for item in items]
 
 
@@ -36,7 +53,15 @@ class ToxicologyStrategy:
     inference_client: InferenceClient
 
     def review(self, hypothesis: Hypothesis) -> List[Critique]:
-        """Runs the toxicology screen and returns critiques."""
+        """
+        Runs the toxicology screen and returns critiques.
+
+        Args:
+            hypothesis: The hypothesis to review.
+
+        Returns:
+            List[Critique]: A list of critiques related to toxicology.
+        """
         logger.debug(f"Running Toxicology Screen for {hypothesis.target_candidate.symbol}...")
         tox_risks = self.inference_client.run_toxicology_screen(hypothesis.target_candidate)
         if tox_risks:
@@ -60,7 +85,15 @@ class ClinicalRedundancyStrategy:
     inference_client: InferenceClient
 
     def review(self, hypothesis: Hypothesis) -> List[Critique]:
-        """Checks for clinical redundancy and returns critiques."""
+        """
+        Checks for clinical redundancy and returns critiques.
+
+        Args:
+            hypothesis: The hypothesis to review.
+
+        Returns:
+            List[Critique]: A list of critiques related to clinical redundancy.
+        """
         logger.debug("Checking Clinical Redundancy...")
         redundancies = self.inference_client.check_clinical_redundancy(
             hypothesis.proposed_mechanism, hypothesis.target_candidate
@@ -85,7 +118,15 @@ class PatentStrategy:
     search_client: SearchClient
 
     def review(self, hypothesis: Hypothesis) -> List[Critique]:
-        """Checks for patent conflicts and returns critiques."""
+        """
+        Checks for patent conflicts and returns critiques.
+
+        Args:
+            hypothesis: The hypothesis to review.
+
+        Returns:
+            List[Critique]: A list of critiques related to patent issues.
+        """
         logger.debug("Checking Patent Infringement...")
         patents = self.search_client.check_patent_infringement(
             hypothesis.target_candidate, hypothesis.proposed_mechanism
@@ -110,7 +151,15 @@ class ScientificSkepticStrategy:
     search_client: SearchClient
 
     def review(self, hypothesis: Hypothesis) -> List[Critique]:
-        """Searches for disconfirming evidence and returns critiques."""
+        """
+        Searches for disconfirming evidence and returns critiques.
+
+        Args:
+            hypothesis: The hypothesis to review.
+
+        Returns:
+            List[Critique]: A list of critiques if disconfirming evidence is found.
+        """
         logger.debug("Searching for Disconfirming Evidence (Null Hypothesis Check)...")
         # Attempt to parse subject/object from hypothesis or use best-effort mapping
         subject = hypothesis.target_candidate.symbol

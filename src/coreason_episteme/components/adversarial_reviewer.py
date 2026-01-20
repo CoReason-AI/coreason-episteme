@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Adversarial Reviewer component implementation.
+
+This module implements the `AdversarialReviewerImpl`, which aggregates multiple
+review strategies to critique generated hypotheses.
+"""
+
 from dataclasses import dataclass, field
 from typing import List
 
@@ -41,7 +48,7 @@ class AdversarialReviewerImpl:
             hypothesis: The hypothesis to review.
 
         Returns:
-            The hypothesis object with appended critiques.
+            Hypothesis: The hypothesis object with appended critiques.
         """
         logger.info(f"Convening Review Board for hypothesis: {hypothesis.id}")
 

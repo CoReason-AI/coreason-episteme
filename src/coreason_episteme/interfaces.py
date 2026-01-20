@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Interface definitions for external clients and internal components.
+
+This module uses Protocol to define the contracts that external dependencies
+and internal components must adhere to.
+"""
+
 from typing import Any, Dict, List, Optional, Protocol
 
 from coreason_episteme.models import BridgeResult, GeneticTarget, Hypothesis, KnowledgeGap
@@ -31,7 +38,7 @@ class GraphNexusClient(Protocol):
             criteria: A dictionary of criteria to filter clusters.
 
         Returns:
-            A list of dictionaries representing disconnected clusters.
+            List[Dict[str, Any]]: A list of dictionaries representing disconnected clusters.
         """
         ...
 
@@ -44,7 +51,7 @@ class GraphNexusClient(Protocol):
             target_cluster_id: The ID of the target cluster.
 
         Returns:
-            A list of GeneticTarget objects representing potential bridges.
+            List[GeneticTarget]: A list of GeneticTarget objects representing potential bridges.
         """
         ...
 
@@ -66,7 +73,7 @@ class InferenceClient(Protocol):
             intervention_target: The target to intervene on.
 
         Returns:
-            A plausibility score between 0.0 and 1.0.
+            float: A plausibility score between 0.0 and 1.0.
         """
         ...
 
@@ -78,7 +85,7 @@ class InferenceClient(Protocol):
             target_candidate: The genetic target to screen.
 
         Returns:
-            A list of potential toxicity risks.
+            List[str]: A list of potential toxicity risks.
         """
         ...
 
@@ -91,7 +98,7 @@ class InferenceClient(Protocol):
             target_candidate: The proposed target.
 
         Returns:
-            A list of redundancy warnings.
+            List[str]: A list of redundancy warnings.
         """
         ...
 
@@ -112,7 +119,7 @@ class CodexClient(Protocol):
             entity2: The second entity.
 
         Returns:
-            A float representing the semantic similarity score.
+            float: A float representing the semantic similarity score.
         """
         ...
 
@@ -124,7 +131,7 @@ class CodexClient(Protocol):
             symbol: The gene symbol to validate.
 
         Returns:
-            A GeneticTarget object if valid, else None.
+            Optional[GeneticTarget]: A GeneticTarget object if valid, else None.
         """
         ...
 
@@ -144,7 +151,7 @@ class PrismClient(Protocol):
             target_id: The identifier of the target.
 
         Returns:
-            A float representing the druggability score.
+            float: A float representing the druggability score.
         """
         ...
 
@@ -165,7 +172,7 @@ class SearchClient(Protocol):
             topic: The topic to search for inconsistencies.
 
         Returns:
-            A list of KnowledgeGap objects representing found inconsistencies.
+            List[KnowledgeGap]: A list of KnowledgeGap objects representing found inconsistencies.
         """
         ...
 
@@ -177,7 +184,7 @@ class SearchClient(Protocol):
             interaction_claim: The claim to verify.
 
         Returns:
-            True if supported, False otherwise.
+            bool: True if supported, False otherwise.
         """
         ...
 
@@ -190,7 +197,7 @@ class SearchClient(Protocol):
             mechanism: The proposed mechanism.
 
         Returns:
-            A list of relevant patents or conflicts.
+            List[str]: A list of relevant patents or conflicts.
         """
         ...
 
@@ -205,7 +212,7 @@ class SearchClient(Protocol):
             action: The action or relationship type.
 
         Returns:
-            A list of citations or snippets supporting the null hypothesis.
+            List[str]: A list of citations or snippets supporting the null hypothesis.
         """
         ...
 
@@ -244,7 +251,7 @@ class GapScanner(Protocol):
             target: The disease or biological entity to scan for.
 
         Returns:
-            A list of KnowledgeGap objects.
+            List[KnowledgeGap]: A list of KnowledgeGap objects.
         """
         ...
 
@@ -263,7 +270,7 @@ class BridgeBuilder(Protocol):
             excluded_targets: Optional list of target symbols to exclude from consideration.
 
         Returns:
-            A BridgeResult containing the hypothesis (if found) and metadata.
+            BridgeResult: A BridgeResult containing the hypothesis (if found) and metadata.
         """
         ...
 
@@ -281,7 +288,7 @@ class CausalValidator(Protocol):
             hypothesis: The hypothesis to validate.
 
         Returns:
-            The hypothesis updated with validation scores.
+            Hypothesis: The hypothesis updated with validation scores.
         """
         ...
 
@@ -299,7 +306,7 @@ class ProtocolDesigner(Protocol):
             hypothesis: The hypothesis to design an experiment for.
 
         Returns:
-            The hypothesis updated with PICO experimental design.
+            Hypothesis: The hypothesis updated with PICO experimental design.
         """
         ...
 
@@ -317,6 +324,6 @@ class AdversarialReviewer(Protocol):
             hypothesis: The hypothesis to review.
 
         Returns:
-            The hypothesis updated with critiques from various strategies.
+            Hypothesis: The hypothesis updated with critiques from various strategies.
         """
         ...

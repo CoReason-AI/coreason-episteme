@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Data models for the coreason-episteme application.
+
+This module defines the Pydantic models used for representing hypotheses,
+knowledge gaps, critiques, and provenance traces.
+"""
+
 import uuid
 from enum import Enum
 from typing import List, Optional
