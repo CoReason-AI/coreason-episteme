@@ -8,11 +8,19 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+from typing import List
 from unittest.mock import MagicMock
 
 import pytest
 
 from coreason_episteme.components.adversarial_reviewer import AdversarialReviewerImpl
+from coreason_episteme.components.review_strategies import (
+    ClinicalRedundancyStrategy,
+    PatentStrategy,
+    ScientificSkepticStrategy,
+    ToxicologyStrategy,
+)
+from coreason_episteme.components.strategies import ReviewStrategy
 from coreason_episteme.models import (
     PICO,
     ConfidenceLevel,
@@ -33,10 +41,13 @@ def mock_search_client() -> MagicMock:
 
 @pytest.fixture
 def adversarial_reviewer(mock_inference_client: MagicMock, mock_search_client: MagicMock) -> AdversarialReviewerImpl:
-    return AdversarialReviewerImpl(
-        inference_client=mock_inference_client,
-        search_client=mock_search_client,
-    )
+    strategies: List[ReviewStrategy] = [
+        ToxicologyStrategy(inference_client=mock_inference_client),
+        ClinicalRedundancyStrategy(inference_client=mock_inference_client),
+        PatentStrategy(search_client=mock_search_client),
+        ScientificSkepticStrategy(search_client=mock_search_client),
+    ]
+    return AdversarialReviewerImpl(strategies=strategies)
 
 
 @pytest.fixture
