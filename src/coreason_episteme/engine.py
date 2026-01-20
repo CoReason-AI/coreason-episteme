@@ -8,8 +8,10 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+from dataclasses import dataclass, field
 from typing import List
 
+from coreason_episteme.config import settings
 from coreason_episteme.interfaces import (
     AdversarialReviewer,
     BridgeBuilder,
@@ -22,27 +24,20 @@ from coreason_episteme.models import CritiqueSeverity, Hypothesis, HypothesisTra
 from coreason_episteme.utils.logger import logger
 
 
+@dataclass
 class EpistemeEngine:
     """
     The Hypothesis Engine (Theorist).
     Orchestrates the Scan-Bridge-Simulate-Critique loop.
     """
 
-    def __init__(
-        self,
-        gap_scanner: GapScanner,
-        bridge_builder: BridgeBuilder,
-        causal_validator: CausalValidator,
-        adversarial_reviewer: AdversarialReviewer,
-        protocol_designer: ProtocolDesigner,
-        veritas_client: VeritasClient,
-    ):
-        self.gap_scanner = gap_scanner
-        self.bridge_builder = bridge_builder
-        self.causal_validator = causal_validator
-        self.adversarial_reviewer = adversarial_reviewer
-        self.protocol_designer = protocol_designer
-        self.veritas_client = veritas_client
+    gap_scanner: GapScanner
+    bridge_builder: BridgeBuilder
+    causal_validator: CausalValidator
+    adversarial_reviewer: AdversarialReviewer
+    protocol_designer: ProtocolDesigner
+    veritas_client: VeritasClient
+    max_retries: int = field(default_factory=lambda: settings.MAX_RETRIES)
 
     def run(self, disease_id: str) -> List[Hypothesis]:
         """
@@ -66,19 +61,18 @@ class EpistemeEngine:
 
         for gap in gaps:
             excluded_targets: List[str] = []
-            max_retries = 3
             attempts = 0
 
             # Initialize Trace
             trace = HypothesisTrace(gap=gap, status="PENDING")
 
-            while attempts < max_retries:
+            while attempts < self.max_retries:
                 attempts += 1
                 trace.excluded_targets_history = list(excluded_targets)  # Update history
                 trace.refinement_retries = attempts - 1
 
                 logger.info(
-                    f"Attempt {attempts}/{max_retries} for gap: {gap.description[:50]}... "
+                    f"Attempt {attempts}/{self.max_retries} for gap: {gap.description[:50]}... "
                     f"(Excluded: {len(excluded_targets)})"
                 )
 
@@ -122,15 +116,6 @@ class EpistemeEngine:
                 hypothesis = self.adversarial_reviewer.review(hypothesis)
 
                 # Accumulate critiques
-                # Note: If we retry, we might want to append critiques or just keep latest?
-                # The model says `critiques: List[Critique]`.
-                # If we loop, we might have critiques from previous failed candidates.
-                # However, the refinement loop restarts bridge building with a NEW candidate.
-                # So the critiques apply to the CURRENT hypothesis.
-                # The Trace model represents the lifecycle of generating *one valid hypothesis* for the gap.
-                # If we reject a candidate, we should probably clear the critiques or mark them as "historical"?
-                # But `Hypothesis` object itself is recreated.
-                # Let's overwrite critiques with the current hypothesis's critiques.
                 trace.critiques = hypothesis.critiques
 
                 # 5. Refinement Check

@@ -8,31 +8,29 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+from dataclasses import dataclass, field
 from typing import List
 
+from coreason_episteme.config import settings
 from coreason_episteme.interfaces import CodexClient, GraphNexusClient, SearchClient
 from coreason_episteme.models import KnowledgeGap, KnowledgeGapType
 from coreason_episteme.utils.logger import logger
 
 
+@dataclass
 class GapScannerImpl:
     """Implementation of the GapScanner (The Void Detector)."""
 
-    def __init__(
-        self,
-        graph_client: GraphNexusClient,
-        codex_client: CodexClient,
-        search_client: SearchClient,
-    ):
-        self.graph_client = graph_client
-        self.codex_client = codex_client
-        self.search_client = search_client
+    graph_client: GraphNexusClient
+    codex_client: CodexClient
+    search_client: SearchClient
+    similarity_threshold: float = field(default_factory=lambda: settings.GAP_SCANNER_SIMILARITY_THRESHOLD)
 
     def scan(self, target: str) -> List[KnowledgeGap]:
         """
         Scans for knowledge gaps (Negative Space Analysis).
 
-        1. Cluster Analysis: Finds disconnected subgraphs with high semantic similarity (>= 0.75).
+        1. Cluster Analysis: Finds disconnected subgraphs with high semantic similarity.
         2. Literature Discrepancy: Finds inconsistencies via Search.
         """
         logger.info(f"Scanning for knowledge gaps related to {target}...")
@@ -51,7 +49,7 @@ class GapScannerImpl:
 
             if cluster_a_id and cluster_b_id:
                 similarity = self.codex_client.get_semantic_similarity(cluster_a_id, cluster_b_id)
-                if similarity >= 0.75:
+                if similarity >= self.similarity_threshold:
                     logger.info(
                         f"Found disconnect with high similarity ({similarity}): {cluster_a_name} <-> {cluster_b_name}"
                     )

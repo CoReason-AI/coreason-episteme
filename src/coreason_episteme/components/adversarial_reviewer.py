@@ -8,11 +8,15 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+from dataclasses import dataclass
+from typing import List
+
 from coreason_episteme.interfaces import InferenceClient, SearchClient
 from coreason_episteme.models import Critique, CritiqueSeverity, Hypothesis
 from coreason_episteme.utils.logger import logger
 
 
+@dataclass
 class AdversarialReviewerImpl:
     """
     Implementation of the Adversarial Reviewer (The Council).
@@ -23,9 +27,12 @@ class AdversarialReviewerImpl:
     3. The IP Strategist (Patent infringement)
     """
 
-    def __init__(self, inference_client: InferenceClient, search_client: SearchClient):
-        self.inference_client = inference_client
-        self.search_client = search_client
+    inference_client: InferenceClient
+    search_client: SearchClient
+
+    def _format_critiques(self, items: List[str], source: str, severity: CritiqueSeverity) -> List[Critique]:
+        """Helper to format list of strings into Critique objects."""
+        return [Critique(source=source, content=item, severity=severity) for item in items]
 
     def review(self, hypothesis: Hypothesis) -> Hypothesis:
         """
@@ -40,10 +47,7 @@ class AdversarialReviewerImpl:
         logger.debug(f"Running Toxicology Screen for {hypothesis.target_candidate.symbol}...")
         tox_risks = self.inference_client.run_toxicology_screen(hypothesis.target_candidate)
         if tox_risks:
-            formatted_risks = [
-                Critique(source="Toxicologist", content=risk, severity=CritiqueSeverity.FATAL) for risk in tox_risks
-            ]
-            critiques.extend(formatted_risks)
+            critiques.extend(self._format_critiques(tox_risks, "Toxicologist", CritiqueSeverity.FATAL))
             logger.info(f"Toxicology risks found: {len(tox_risks)}")
 
         # 2. The Clinician (Inference)
@@ -52,10 +56,7 @@ class AdversarialReviewerImpl:
             hypothesis.proposed_mechanism, hypothesis.target_candidate
         )
         if redundancies:
-            formatted_redundancies = [
-                Critique(source="Clinician", content=item, severity=CritiqueSeverity.MEDIUM) for item in redundancies
-            ]
-            critiques.extend(formatted_redundancies)
+            critiques.extend(self._format_critiques(redundancies, "Clinician", CritiqueSeverity.MEDIUM))
             logger.info(f"Clinical redundancies found: {len(redundancies)}")
 
         # 3. The IP Strategist (Search)
@@ -64,21 +65,13 @@ class AdversarialReviewerImpl:
             hypothesis.target_candidate, hypothesis.proposed_mechanism
         )
         if patents:
-            formatted_patents = [
-                Critique(source="IP Strategist", content=patent, severity=CritiqueSeverity.HIGH) for patent in patents
-            ]
-            critiques.extend(formatted_patents)
+            critiques.extend(self._format_critiques(patents, "IP Strategist", CritiqueSeverity.HIGH))
             logger.info(f"Patent conflicts found: {len(patents)}")
 
         # 4. The Scientific Skeptic (Strict Null Hypothesis)
         logger.debug("Searching for Disconfirming Evidence (Null Hypothesis Check)...")
         # Attempt to parse subject/object from hypothesis or use best-effort mapping
-        # Subject: Intervention Target
-        # Object: Disease/Outcome (from knowledge gap or mechanism context)
-        # Action: "regulate" or "affect"
         subject = hypothesis.target_candidate.symbol
-        # We try to extract the object from the mechanism or gap description.
-        # For robustness, we'll use the mechanism summary as the context.
         object_context = hypothesis.knowledge_gap
         action = "affect"
 
@@ -87,15 +80,9 @@ class AdversarialReviewerImpl:
         )
 
         if disconfirming_evidence:
-            formatted_skepticism = [
-                Critique(
-                    source="Scientific Skeptic",
-                    content=f"Disconfirming evidence found: {evidence}",
-                    severity=CritiqueSeverity.FATAL,
-                )
-                for evidence in disconfirming_evidence
-            ]
-            critiques.extend(formatted_skepticism)
+            # We use a slightly different content format for evidence
+            formatted_evidence = [f"Disconfirming evidence found: {e}" for e in disconfirming_evidence]
+            critiques.extend(self._format_critiques(formatted_evidence, "Scientific Skeptic", CritiqueSeverity.FATAL))
             logger.info(f"Disconfirming evidence found: {len(disconfirming_evidence)}")
 
         # Append to hypothesis
