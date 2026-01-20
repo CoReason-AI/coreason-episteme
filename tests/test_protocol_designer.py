@@ -14,12 +14,12 @@ from coreason_episteme.components.protocol_designer import ProtocolDesignerImpl
 from coreason_episteme.models import PICO, ConfidenceLevel, GeneticTarget, Hypothesis
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def protocol_designer() -> ProtocolDesignerImpl:
     return ProtocolDesignerImpl()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def sample_hypothesis() -> Hypothesis:
     target = GeneticTarget(
         symbol="TargetX",

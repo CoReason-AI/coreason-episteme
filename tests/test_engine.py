@@ -24,7 +24,7 @@ from tests.mocks import (
 )
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def engine() -> EpistemeEngine:
     return EpistemeEngine(
         gap_scanner=MockGapScanner(),
