@@ -15,6 +15,13 @@ from coreason_episteme.components.bridge_builder import BridgeBuilderImpl
 from coreason_episteme.components.causal_validator import CausalValidatorImpl
 from coreason_episteme.components.gap_scanner import GapScannerImpl
 from coreason_episteme.components.protocol_designer import ProtocolDesignerImpl
+from coreason_episteme.components.review_strategies import (
+    ClinicalRedundancyStrategy,
+    PatentStrategy,
+    ScientificSkepticStrategy,
+    ToxicologyStrategy,
+)
+from coreason_episteme.components.strategies import ReviewStrategy
 from coreason_episteme.config import settings
 from coreason_episteme.engine import EpistemeEngine
 from coreason_episteme.interfaces import (
@@ -50,52 +57,51 @@ def generate_hypothesis(
     """
     logger.info(f"Request received: generate_hypothesis for {disease_id}")
 
-    # Check dependencies
-    if not all(
-        [
-            graph_client,
-            codex_client,
-            search_client,
-            prism_client,
-            inference_client,
-            veritas_client,
-        ]
-    ):
-        error_msg = (
-            "Missing required external clients. "
-            "Please provide implementations for: GraphNexus, Codex, Search, Prism, Inference, and Veritas."
-        )
-        logger.error(error_msg)
-        raise RuntimeError(error_msg)
+    # Check dependencies and ensure they are not None
+    if graph_client is None:
+        raise RuntimeError("Missing required external client: GraphNexusClient")
+    if codex_client is None:
+        raise RuntimeError("Missing required external client: CodexClient")
+    if search_client is None:
+        raise RuntimeError("Missing required external client: SearchClient")
+    if prism_client is None:
+        raise RuntimeError("Missing required external client: PrismClient")
+    if inference_client is None:
+        raise RuntimeError("Missing required external client: InferenceClient")
+    if veritas_client is None:
+        raise RuntimeError("Missing required external client: VeritasClient")
 
     # Initialize Components (Dependency Injection)
-    # The type ignores are because mypy might complain about Optional vs Required if we didn't check
-    # but we did check above with `if not all(...)`.
-    # However, mypy doesn't always infer type narrowing from `all()`.
-    # So we can assert or cast, but explicit is better.
 
     gap_scanner = GapScannerImpl(
-        graph_client=graph_client,  # type: ignore
-        codex_client=codex_client,  # type: ignore
-        search_client=search_client,  # type: ignore
+        graph_client=graph_client,
+        codex_client=codex_client,
+        search_client=search_client,
         similarity_threshold=settings.GAP_SCANNER_SIMILARITY_THRESHOLD,
     )
 
     bridge_builder = BridgeBuilderImpl(
-        graph_client=graph_client,  # type: ignore
-        prism_client=prism_client,  # type: ignore
-        codex_client=codex_client,  # type: ignore
-        search_client=search_client,  # type: ignore
+        graph_client=graph_client,
+        prism_client=prism_client,
+        codex_client=codex_client,
+        search_client=search_client,
         druggability_threshold=settings.DRUGGABILITY_THRESHOLD,
     )
 
     causal_validator = CausalValidatorImpl(
-        inference_client=inference_client,  # type: ignore
+        inference_client=inference_client,
     )
 
+    # Initialize Strategies
+    strategies: List[ReviewStrategy] = [
+        ToxicologyStrategy(inference_client=inference_client),
+        ClinicalRedundancyStrategy(inference_client=inference_client),
+        PatentStrategy(search_client=search_client),
+        ScientificSkepticStrategy(search_client=search_client),
+    ]
+
     adversarial_reviewer = AdversarialReviewerImpl(
-        inference_client=inference_client,  # type: ignore
-        search_client=search_client,  # type: ignore
+        strategies=strategies,
     )
 
     protocol_designer = ProtocolDesignerImpl()
@@ -107,12 +113,10 @@ def generate_hypothesis(
         causal_validator=causal_validator,
         adversarial_reviewer=adversarial_reviewer,
         protocol_designer=protocol_designer,
-        veritas_client=veritas_client,  # type: ignore[arg-type]
+        veritas_client=veritas_client,
         max_retries=settings.MAX_RETRIES,
     )
 
     # Run
-    # Mypy cannot infer that engine.run returns List[Hypothesis] if engine is inferred as Any
-    # Explicitly hinting result
     results: List[Hypothesis] = engine.run(disease_id)
     return results
