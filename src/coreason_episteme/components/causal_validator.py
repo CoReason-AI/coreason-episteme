@@ -8,16 +8,18 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+from dataclasses import dataclass
+
 from coreason_episteme.interfaces import InferenceClient
 from coreason_episteme.models import Hypothesis
 from coreason_episteme.utils.logger import logger
 
 
+@dataclass
 class CausalValidatorImpl:
     """Implementation of the Causal Validator (The Simulator)."""
 
-    def __init__(self, inference_client: InferenceClient):
-        self.inference_client = inference_client
+    inference_client: InferenceClient
 
     def validate(self, hypothesis: Hypothesis) -> Hypothesis:
         """

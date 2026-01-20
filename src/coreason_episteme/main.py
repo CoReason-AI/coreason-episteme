@@ -15,6 +15,7 @@ from coreason_episteme.components.bridge_builder import BridgeBuilderImpl
 from coreason_episteme.components.causal_validator import CausalValidatorImpl
 from coreason_episteme.components.gap_scanner import GapScannerImpl
 from coreason_episteme.components.protocol_designer import ProtocolDesignerImpl
+from coreason_episteme.config import settings
 from coreason_episteme.engine import EpistemeEngine
 from coreason_episteme.interfaces import (
     CodexClient,
@@ -77,6 +78,7 @@ def generate_hypothesis(
         graph_client=graph_client,  # type: ignore
         codex_client=codex_client,  # type: ignore
         search_client=search_client,  # type: ignore
+        similarity_threshold=settings.GAP_SCANNER_SIMILARITY_THRESHOLD,
     )
 
     bridge_builder = BridgeBuilderImpl(
@@ -84,6 +86,7 @@ def generate_hypothesis(
         prism_client=prism_client,  # type: ignore
         codex_client=codex_client,  # type: ignore
         search_client=search_client,  # type: ignore
+        druggability_threshold=settings.DRUGGABILITY_THRESHOLD,
     )
 
     causal_validator = CausalValidatorImpl(
@@ -105,6 +108,7 @@ def generate_hypothesis(
         adversarial_reviewer=adversarial_reviewer,
         protocol_designer=protocol_designer,
         veritas_client=veritas_client,  # type: ignore[arg-type]
+        max_retries=settings.MAX_RETRIES,
     )
 
     # Run
