@@ -58,7 +58,9 @@ class BridgeBuilderImpl:
     search_client: SearchClient
     druggability_threshold: float = field(default_factory=lambda: settings.DRUGGABILITY_THRESHOLD)
 
-    def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+    async def generate_hypothesis(
+        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+    ) -> BridgeResult:
         """
         Generates a hypothesis bridging the knowledge gap.
 
@@ -91,7 +93,7 @@ class BridgeBuilderImpl:
         source_id = gap.source_nodes[0]
         target_id = gap.source_nodes[1]
 
-        potential_bridges = self.graph_client.find_latent_bridges(source_id, target_id)
+        potential_bridges = await self.graph_client.find_latent_bridges(source_id, target_id)
 
         # Populate metadata
         result_metadata["bridges_found_count"] = len(potential_bridges)
@@ -111,10 +113,10 @@ class BridgeBuilderImpl:
                 continue
 
             # Check druggability
-            druggability = self.prism_client.check_druggability(bridge.ensembl_id)
+            druggability = await self.prism_client.check_druggability(bridge.ensembl_id)
             if druggability > self.druggability_threshold:  # Threshold for "druggable"
                 # Validate details with Codex
-                validated_target = self.codex_client.validate_target(bridge.symbol)
+                validated_target = await self.codex_client.validate_target(bridge.symbol)
                 if validated_target:
                     # Hallucination Check: Verify citation
                     # We construct a claim to verify.
@@ -122,7 +124,7 @@ class BridgeBuilderImpl:
                         f"{source_id} interacts with {validated_target.symbol} "
                         f"and {validated_target.symbol} affects {target_id}"
                     )
-                    is_verified = self.search_client.verify_citation(interaction_claim)
+                    is_verified = await self.search_client.verify_citation(interaction_claim)
 
                     if is_verified:
                         # Update with fresh data from Codex (and keep the druggability score)
