@@ -25,7 +25,7 @@ class ReviewStrategy(Protocol):
     Interface for an adversarial review strategy (The Council Member).
     """
 
-    def review(self, hypothesis: Hypothesis) -> List[Critique]:
+    async def review(self, hypothesis: Hypothesis) -> List[Critique]:
         """
         Conducts a review of the hypothesis and returns a list of critiques.
 

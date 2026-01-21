@@ -16,7 +16,7 @@ orchestrating the injection of dependencies and the execution of the EpistemeEng
 """
 
 from types import TracebackType
-from typing import Any, List, Optional, Type, cast
+from typing import Any, List, Optional, Type
 
 import anyio
 import httpx
@@ -175,8 +175,7 @@ class Episteme:
         """
         Executes the hypothesis generation pipeline (blocking).
         """
-        result = anyio.run(self._async.run, disease_id)
-        return cast(List[Hypothesis], result)
+        return anyio.run(self._async.run, disease_id)
 
 
 def generate_hypothesis(
