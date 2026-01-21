@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
 from typing import List
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -30,17 +30,17 @@ from coreason_episteme.models import (
 
 
 @pytest.fixture
-def mock_inference_client() -> MagicMock:
-    return MagicMock()
+def mock_inference_client() -> AsyncMock:
+    return AsyncMock()
 
 
 @pytest.fixture
-def mock_search_client() -> MagicMock:
-    return MagicMock()
+def mock_search_client() -> AsyncMock:
+    return AsyncMock()
 
 
 @pytest.fixture
-def adversarial_reviewer(mock_inference_client: MagicMock, mock_search_client: MagicMock) -> AdversarialReviewerImpl:
+def adversarial_reviewer(mock_inference_client: AsyncMock, mock_search_client: AsyncMock) -> AdversarialReviewerImpl:
     strategies: List[ReviewStrategy] = [
         ToxicologyStrategy(inference_client=mock_inference_client),
         ClinicalRedundancyStrategy(inference_client=mock_inference_client),
@@ -79,10 +79,11 @@ def sample_hypothesis() -> Hypothesis:
     )
 
 
-def test_review_service_returns_none(
+@pytest.mark.asyncio
+async def test_review_service_returns_none(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """
@@ -94,16 +95,17 @@ def test_review_service_returns_none(
     mock_inference_client.check_clinical_redundancy.return_value = None
     mock_search_client.check_patent_infringement.return_value = None
 
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Should have 0 critiques, not crash
     assert len(reviewed_hypothesis.critiques) == 0
 
 
-def test_review_high_volume_critiques(
+@pytest.mark.asyncio
+async def test_review_high_volume_critiques(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """
@@ -115,7 +117,7 @@ def test_review_high_volume_critiques(
     mock_inference_client.check_clinical_redundancy.return_value = [f"Redundancy {i}" for i in range(50)]
     mock_search_client.check_patent_infringement.return_value = [f"Patent {i}" for i in range(50)]
 
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Should have 150 critiques
     assert len(reviewed_hypothesis.critiques) == 150
@@ -124,9 +126,10 @@ def test_review_high_volume_critiques(
     assert any("Redundancy 0" in c.content and c.source == "Clinician" for c in reviewed_hypothesis.critiques)
 
 
-def test_review_exception_propagation(
+@pytest.mark.asyncio
+async def test_review_exception_propagation(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
+    mock_inference_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """
@@ -136,13 +139,14 @@ def test_review_exception_propagation(
     mock_inference_client.run_toxicology_screen.side_effect = RuntimeError("Service Down")
 
     with pytest.raises(RuntimeError, match="Service Down"):
-        adversarial_reviewer.review(sample_hypothesis)
+        await adversarial_reviewer.review(sample_hypothesis)
 
 
-def test_review_cumulative_critiques(
+@pytest.mark.asyncio
+async def test_review_cumulative_critiques(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """
@@ -154,13 +158,13 @@ def test_review_cumulative_critiques(
     mock_inference_client.check_clinical_redundancy.return_value = []
     mock_search_client.check_patent_infringement.return_value = []
 
-    hypo_v1 = adversarial_reviewer.review(sample_hypothesis)
+    hypo_v1 = await adversarial_reviewer.review(sample_hypothesis)
     assert len(hypo_v1.critiques) == 1
 
     # Second run (maybe different results?)
     mock_inference_client.run_toxicology_screen.return_value = ["Risk B"]
 
-    hypo_v2 = adversarial_reviewer.review(hypo_v1)
+    hypo_v2 = await adversarial_reviewer.review(hypo_v1)
 
     # Should have 2 critiques now (Risk A + Risk B)
     assert len(hypo_v2.critiques) == 2
@@ -168,10 +172,11 @@ def test_review_cumulative_critiques(
     assert any("Risk B" in c.content for c in hypo_v2.critiques)
 
 
-def test_review_scientific_skeptic_failure_handling(
+@pytest.mark.asyncio
+async def test_review_scientific_skeptic_failure_handling(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """
@@ -185,16 +190,17 @@ def test_review_scientific_skeptic_failure_handling(
     # Simulate None return from search client
     mock_search_client.find_disconfirming_evidence.return_value = None
 
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Should have 0 critiques
     assert len(reviewed_hypothesis.critiques) == 0
 
 
-def test_review_all_reviewers_trigger(
+@pytest.mark.asyncio
+async def test_review_all_reviewers_trigger(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """
@@ -206,7 +212,7 @@ def test_review_all_reviewers_trigger(
     mock_search_client.check_patent_infringement.return_value = ["Patent Breach"]
     mock_search_client.find_disconfirming_evidence.return_value = ["Paper says NO"]
 
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     assert len(reviewed_hypothesis.critiques) == 4
 
@@ -217,10 +223,11 @@ def test_review_all_reviewers_trigger(
     assert "Scientific Skeptic" in critique_sources
 
 
-def test_review_empty_strings_robustness(
+@pytest.mark.asyncio
+async def test_review_empty_strings_robustness(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """
@@ -235,7 +242,7 @@ def test_review_empty_strings_robustness(
     sample_hypothesis.target_candidate.symbol = ""
     sample_hypothesis.knowledge_gap = ""
 
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Verify call was still made with empty strings
     mock_search_client.find_disconfirming_evidence.assert_called_once_with(subject="", object="", action="affect")

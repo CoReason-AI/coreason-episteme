@@ -31,7 +31,7 @@ from coreason_episteme.models import (
 class EmptyStrategy:
     """Strategy that does nothing."""
 
-    def review(self, hypothesis: Hypothesis) -> List[Critique]:
+    async def review(self, hypothesis: Hypothesis) -> List[Critique]:
         return []
 
 
@@ -41,7 +41,7 @@ class MalfunctioningStrategy:
 
     error_message: str = "Strategy Failed"
 
-    def review(self, hypothesis: Hypothesis) -> List[Critique]:
+    async def review(self, hypothesis: Hypothesis) -> List[Critique]:
         raise ValueError(self.error_message)
 
 
@@ -49,7 +49,7 @@ class MalfunctioningStrategy:
 class NoneReturningStrategy:
     """Strategy that violates protocol by returning None."""
 
-    def review(self, hypothesis: Hypothesis) -> List[Critique]:
+    async def review(self, hypothesis: Hypothesis) -> List[Critique]:
         return None  # type: ignore
 
 
@@ -59,7 +59,7 @@ class CustomCritiqueStrategy:
 
     critiques_to_return: List[Critique]
 
-    def review(self, hypothesis: Hypothesis) -> List[Critique]:
+    async def review(self, hypothesis: Hypothesis) -> List[Critique]:
         return self.critiques_to_return
 
 
@@ -86,17 +86,19 @@ def sample_hypothesis() -> Hypothesis:
 # --- Tests ---
 
 
-def test_reviewer_with_no_strategies(sample_hypothesis: Hypothesis) -> None:
+@pytest.mark.asyncio
+async def test_reviewer_with_no_strategies(sample_hypothesis: Hypothesis) -> None:
     """
     Edge Case: Reviewer initialized with empty list of strategies.
     Should run without error and produce 0 critiques.
     """
     reviewer = AdversarialReviewerImpl(strategies=[])
-    result = reviewer.review(sample_hypothesis)
+    result = await reviewer.review(sample_hypothesis)
     assert len(result.critiques) == 0
 
 
-def test_reviewer_with_malfunctioning_strategy(sample_hypothesis: Hypothesis) -> None:
+@pytest.mark.asyncio
+async def test_reviewer_with_malfunctioning_strategy(sample_hypothesis: Hypothesis) -> None:
     """
     Edge Case: One strategy raises an exception.
     The exception should propagate (Fail Fast).
@@ -109,10 +111,11 @@ def test_reviewer_with_malfunctioning_strategy(sample_hypothesis: Hypothesis) ->
     reviewer = AdversarialReviewerImpl(strategies=strategies)
 
     with pytest.raises(ValueError, match="Boom!"):
-        reviewer.review(sample_hypothesis)
+        await reviewer.review(sample_hypothesis)
 
 
-def test_reviewer_with_none_returning_strategy(sample_hypothesis: Hypothesis) -> None:
+@pytest.mark.asyncio
+async def test_reviewer_with_none_returning_strategy(sample_hypothesis: Hypothesis) -> None:
     """
     Edge Case: Strategy violates protocol and returns None.
     Reviewer expects iterable, so this will likely raise TypeError when extending.
@@ -123,10 +126,11 @@ def test_reviewer_with_none_returning_strategy(sample_hypothesis: Hypothesis) ->
     reviewer = AdversarialReviewerImpl(strategies=strategies)
 
     with pytest.raises(TypeError):
-        reviewer.review(sample_hypothesis)
+        await reviewer.review(sample_hypothesis)
 
 
-def test_reviewer_complex_mix(sample_hypothesis: Hypothesis) -> None:
+@pytest.mark.asyncio
+async def test_reviewer_complex_mix(sample_hypothesis: Hypothesis) -> None:
     """
     Complex Scenario: Multiple strategies returning mixed critiques.
     Verifies aggregation and order.
@@ -141,7 +145,7 @@ def test_reviewer_complex_mix(sample_hypothesis: Hypothesis) -> None:
     ]
 
     reviewer = AdversarialReviewerImpl(strategies=strategies)
-    result = reviewer.review(sample_hypothesis)
+    result = await reviewer.review(sample_hypothesis)
 
     assert len(result.critiques) == 2
     assert result.critiques[0] == critique_fatal

@@ -36,7 +36,7 @@ class CausalValidatorImpl:
 
     inference_client: InferenceClient
 
-    def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def validate(self, hypothesis: Hypothesis) -> Hypothesis:
         """
         Validates the hypothesis using causal simulation.
 
@@ -56,7 +56,7 @@ class CausalValidatorImpl:
         intervention_target = hypothesis.target_candidate.symbol
 
         # Run counterfactual simulation
-        score = self.inference_client.run_counterfactual_simulation(
+        score = await self.inference_client.run_counterfactual_simulation(
             mechanism=mechanism,
             intervention_target=intervention_target,
         )

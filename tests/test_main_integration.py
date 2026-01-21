@@ -19,53 +19,53 @@ from coreason_episteme.models import GeneticTarget, KnowledgeGap
 
 
 class StubGraphNexusClient:
-    def find_disconnected_clusters(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def find_disconnected_clusters(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
         return []
 
-    def find_latent_bridges(self, source_cluster_id: str, target_cluster_id: str) -> List[GeneticTarget]:
+    async def find_latent_bridges(self, source_cluster_id: str, target_cluster_id: str) -> List[GeneticTarget]:
         return []
 
 
 class StubCodexClient:
-    def get_semantic_similarity(self, entity1: str, entity2: str) -> float:
+    async def get_semantic_similarity(self, entity1: str, entity2: str) -> float:
         return 0.0
 
-    def validate_target(self, symbol: str) -> Optional[GeneticTarget]:
+    async def validate_target(self, symbol: str) -> Optional[GeneticTarget]:
         return None
 
 
 class StubSearchClient:
-    def find_literature_inconsistency(self, topic: str) -> List[KnowledgeGap]:
+    async def find_literature_inconsistency(self, topic: str) -> List[KnowledgeGap]:
         return []
 
-    def verify_citation(self, interaction_claim: str) -> bool:
+    async def verify_citation(self, interaction_claim: str) -> bool:
         return False
 
-    def check_patent_infringement(self, target_candidate: GeneticTarget, mechanism: str) -> List[str]:
+    async def check_patent_infringement(self, target_candidate: GeneticTarget, mechanism: str) -> List[str]:
         return []
 
-    def find_disconfirming_evidence(self, subject: str, object: str, action: str) -> List[str]:
+    async def find_disconfirming_evidence(self, subject: str, object: str, action: str) -> List[str]:
         return []
 
 
 class StubPrismClient:
-    def check_druggability(self, target_id: str) -> float:
+    async def check_druggability(self, target_id: str) -> float:
         return 0.0
 
 
 class StubInferenceClient:
-    def run_counterfactual_simulation(self, mechanism: str, intervention_target: str) -> float:
+    async def run_counterfactual_simulation(self, mechanism: str, intervention_target: str) -> float:
         return 0.0
 
-    def run_toxicology_screen(self, target_candidate: GeneticTarget) -> List[str]:
+    async def run_toxicology_screen(self, target_candidate: GeneticTarget) -> List[str]:
         return []
 
-    def check_clinical_redundancy(self, mechanism: str, target_candidate: GeneticTarget) -> List[str]:
+    async def check_clinical_redundancy(self, mechanism: str, target_candidate: GeneticTarget) -> List[str]:
         return []
 
 
 class StubVeritasClient:
-    def log_trace(self, hypothesis_id: str, trace_data: Dict[str, Any]) -> None:
+    async def log_trace(self, hypothesis_id: str, trace_data: Dict[str, Any]) -> None:
         pass
 
 

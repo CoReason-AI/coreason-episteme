@@ -11,12 +11,13 @@
 """
 Core Engine module for coreason-episteme.
 
-This module contains the `EpistemeEngine` class, which orchestrates the
+This module contains the `EpistemeEngineAsync` class, which orchestrates the
 primary "Scan-Bridge-Simulate-Critique" workflow loop.
 """
 
 from dataclasses import dataclass, field
-from typing import List
+from types import TracebackType
+from typing import List, Optional, Type
 
 from coreason_episteme.config import settings
 from coreason_episteme.interfaces import (
@@ -32,7 +33,7 @@ from coreason_episteme.utils.logger import logger
 
 
 @dataclass
-class EpistemeEngine:
+class EpistemeEngineAsync:
     """
     The Hypothesis Engine (Theorist).
 
@@ -58,7 +59,20 @@ class EpistemeEngine:
     veritas_client: VeritasClient
     max_retries: int = field(default_factory=lambda: settings.MAX_RETRIES)
 
-    def run(self, disease_id: str) -> List[Hypothesis]:
+    async def __aenter__(self) -> "EpistemeEngineAsync":
+        # Placeholder for resource initialization if needed
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        # Placeholder for resource cleanup if needed
+        pass
+
+    async def run(self, disease_id: str) -> List[Hypothesis]:
         """
         Executes the hypothesis generation pipeline for a given disease ID.
 
@@ -82,7 +96,7 @@ class EpistemeEngine:
         results: List[Hypothesis] = []
 
         # 1. Gap Scanning
-        gaps = self.gap_scanner.scan(disease_id)
+        gaps = await self.gap_scanner.scan(disease_id)
         if not gaps:
             logger.info("No knowledge gaps found. Exiting.")
             return []
@@ -106,7 +120,9 @@ class EpistemeEngine:
                     )
 
                     # 2. Latent Bridging
-                    bridge_result = self.bridge_builder.generate_hypothesis(gap, excluded_targets=excluded_targets)
+                    bridge_result = await self.bridge_builder.generate_hypothesis(
+                        gap, excluded_targets=excluded_targets
+                    )
 
                     # Accumulate bridge metadata
                     trace.bridges_found_count = bridge_result.bridges_found_count
@@ -124,7 +140,7 @@ class EpistemeEngine:
                     trace.bridge_id = hypothesis.target_candidate.ensembl_id
 
                     # 3. Causal Simulation
-                    hypothesis = self.causal_validator.validate(hypothesis)
+                    hypothesis = await self.causal_validator.validate(hypothesis)
 
                     # Accumulate validation data
                     trace.causal_validation_score = hypothesis.causal_validation_score
@@ -140,7 +156,7 @@ class EpistemeEngine:
                         break
 
                     # 4. Adversarial Review
-                    hypothesis = self.adversarial_reviewer.review(hypothesis)
+                    hypothesis = await self.adversarial_reviewer.review(hypothesis)
 
                     # Accumulate critiques
                     trace.critiques = hypothesis.critiques
@@ -158,14 +174,14 @@ class EpistemeEngine:
                     else:
                         # Success!
                         # 6. Protocol Design
-                        hypothesis = self.protocol_designer.design_experiment(hypothesis)
+                        hypothesis = await self.protocol_designer.design_experiment(hypothesis)
 
                         trace.result = hypothesis
                         trace.status = "ACCEPTED"
 
                         # Log the final trace
                         if trace.hypothesis_id:
-                            self.veritas_client.log_trace(
+                            await self.veritas_client.log_trace(
                                 trace.hypothesis_id,
                                 trace.model_dump(),
                             )
@@ -179,7 +195,7 @@ class EpistemeEngine:
                     # If we never got a hypothesis ID (e.g. no bridges), we generate a UUID or use None
                     # The interface requires hypothesis_id: str.
                     log_id = trace.hypothesis_id or f"failed-gap-{gap.id}"
-                    self.veritas_client.log_trace(
+                    await self.veritas_client.log_trace(
                         log_id,
                         trace.model_dump(),
                     )
@@ -188,7 +204,7 @@ class EpistemeEngine:
                 logger.exception(f"Error processing gap {gap.description}: {e}")
                 trace.status = f"ERROR: {str(e)}"
                 log_id = trace.hypothesis_id or f"error-gap-{gap.id}"
-                self.veritas_client.log_trace(
+                await self.veritas_client.log_trace(
                     log_id,
                     trace.model_dump(),
                 )

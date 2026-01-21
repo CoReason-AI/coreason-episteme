@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -24,31 +24,31 @@ from coreason_episteme.models import (
 
 
 @pytest.fixture
-def mock_graph_client() -> MagicMock:
-    return MagicMock()
+def mock_graph_client() -> AsyncMock:
+    return AsyncMock()
 
 
 @pytest.fixture
-def mock_prism_client() -> MagicMock:
-    return MagicMock()
+def mock_prism_client() -> AsyncMock:
+    return AsyncMock()
 
 
 @pytest.fixture
-def mock_codex_client() -> MagicMock:
-    return MagicMock()
+def mock_codex_client() -> AsyncMock:
+    return AsyncMock()
 
 
 @pytest.fixture
-def mock_search_client() -> MagicMock:
-    return MagicMock()
+def mock_search_client() -> AsyncMock:
+    return AsyncMock()
 
 
 @pytest.fixture
 def bridge_builder(
-    mock_graph_client: MagicMock,
-    mock_prism_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_prism_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> BridgeBuilderImpl:
     return BridgeBuilderImpl(
         graph_client=mock_graph_client,
@@ -58,12 +58,13 @@ def bridge_builder(
     )
 
 
-def test_generate_hypothesis_success(
+@pytest.mark.asyncio
+async def test_generate_hypothesis_success(
     bridge_builder: BridgeBuilderImpl,
-    mock_graph_client: MagicMock,
-    mock_prism_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_prism_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """Test successful hypothesis generation with metadata return."""
     # Setup inputs
@@ -89,7 +90,7 @@ def test_generate_hypothesis_success(
     mock_search_client.verify_citation.return_value = True
 
     # Execute
-    result = bridge_builder.generate_hypothesis(gap)
+    result = await bridge_builder.generate_hypothesis(gap)
 
     # Verify Result Structure
     assert isinstance(result, BridgeResult)
@@ -112,12 +113,13 @@ def test_generate_hypothesis_success(
     mock_search_client.verify_citation.assert_called_with(expected_claim)
 
 
-def test_generate_hypothesis_citation_verification_fail(
+@pytest.mark.asyncio
+async def test_generate_hypothesis_citation_verification_fail(
     bridge_builder: BridgeBuilderImpl,
-    mock_graph_client: MagicMock,
-    mock_prism_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_prism_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """Test when citation verification fails."""
     gap = KnowledgeGap(
@@ -140,7 +142,7 @@ def test_generate_hypothesis_citation_verification_fail(
     mock_search_client.verify_citation.return_value = False
 
     # Execute
-    result = bridge_builder.generate_hypothesis(gap)
+    result = await bridge_builder.generate_hypothesis(gap)
 
     # Verify
     assert result.hypothesis is None
@@ -149,7 +151,8 @@ def test_generate_hypothesis_citation_verification_fail(
     mock_search_client.verify_citation.assert_called()
 
 
-def test_generate_hypothesis_no_bridges(bridge_builder: BridgeBuilderImpl, mock_graph_client: MagicMock) -> None:
+@pytest.mark.asyncio
+async def test_generate_hypothesis_no_bridges(bridge_builder: BridgeBuilderImpl, mock_graph_client: AsyncMock) -> None:
     """Test when no latent bridges are found."""
     gap = KnowledgeGap(
         description="Gap between A and B",
@@ -158,17 +161,18 @@ def test_generate_hypothesis_no_bridges(bridge_builder: BridgeBuilderImpl, mock_
     )
     mock_graph_client.find_latent_bridges.return_value = []
 
-    result = bridge_builder.generate_hypothesis(gap)
+    result = await bridge_builder.generate_hypothesis(gap)
 
     assert result.hypothesis is None
     assert result.bridges_found_count == 0
     assert result.considered_candidates == []
 
 
-def test_generate_hypothesis_no_druggable_bridges(
+@pytest.mark.asyncio
+async def test_generate_hypothesis_no_druggable_bridges(
     bridge_builder: BridgeBuilderImpl,
-    mock_graph_client: MagicMock,
-    mock_prism_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_prism_client: AsyncMock,
 ) -> None:
     """Test when bridges exist but are not druggable."""
     gap = KnowledgeGap(
@@ -186,18 +190,19 @@ def test_generate_hypothesis_no_druggable_bridges(
     mock_graph_client.find_latent_bridges.return_value = [bridge_target]
     mock_prism_client.check_druggability.return_value = 0.3
 
-    result = bridge_builder.generate_hypothesis(gap)
+    result = await bridge_builder.generate_hypothesis(gap)
 
     assert result.hypothesis is None
     assert result.bridges_found_count == 1
     assert "GeneY" in result.considered_candidates
 
 
-def test_generate_hypothesis_codex_validation_fail(
+@pytest.mark.asyncio
+async def test_generate_hypothesis_codex_validation_fail(
     bridge_builder: BridgeBuilderImpl,
-    mock_graph_client: MagicMock,
-    mock_prism_client: MagicMock,
-    mock_codex_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_prism_client: AsyncMock,
+    mock_codex_client: AsyncMock,
 ) -> None:
     """Test when Codex fails to validate the target."""
     gap = KnowledgeGap(
@@ -216,14 +221,15 @@ def test_generate_hypothesis_codex_validation_fail(
     mock_prism_client.check_druggability.return_value = 0.8
     mock_codex_client.validate_target.return_value = None
 
-    result = bridge_builder.generate_hypothesis(gap)
+    result = await bridge_builder.generate_hypothesis(gap)
 
     assert result.hypothesis is None
     assert result.bridges_found_count == 1
     assert "GeneZ" in result.considered_candidates
 
 
-def test_generate_hypothesis_insufficient_nodes(
+@pytest.mark.asyncio
+async def test_generate_hypothesis_insufficient_nodes(
     bridge_builder: BridgeBuilderImpl,
 ) -> None:
     """Test when gap has fewer than 2 source nodes."""
@@ -233,17 +239,18 @@ def test_generate_hypothesis_insufficient_nodes(
         type=KnowledgeGapType.CLUSTER_DISCONNECT,
     )
 
-    result = bridge_builder.generate_hypothesis(gap_one_node)
+    result = await bridge_builder.generate_hypothesis(gap_one_node)
     assert result.hypothesis is None
     assert result.bridges_found_count == 0
 
 
-def test_generate_hypothesis_excluded_targets(
+@pytest.mark.asyncio
+async def test_generate_hypothesis_excluded_targets(
     bridge_builder: BridgeBuilderImpl,
-    mock_graph_client: MagicMock,
-    mock_prism_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_prism_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """Test filtering of excluded targets."""
     gap = KnowledgeGap(
@@ -273,7 +280,7 @@ def test_generate_hypothesis_excluded_targets(
     mock_search_client.verify_citation.return_value = True
 
     # Exclude ToxicGene
-    result = bridge_builder.generate_hypothesis(gap, excluded_targets=["ToxicGene"])
+    result = await bridge_builder.generate_hypothesis(gap, excluded_targets=["ToxicGene"])
 
     assert result.hypothesis is not None
     assert result.hypothesis.target_candidate.symbol == "SafeGene"

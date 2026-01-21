@@ -12,7 +12,7 @@ from typing import List, Optional
 
 import pytest
 
-from coreason_episteme.engine import EpistemeEngine
+from coreason_episteme.engine import EpistemeEngineAsync
 from coreason_episteme.models import BridgeResult, KnowledgeGap
 from tests.mocks import (
     MockAdversarialReviewer,
@@ -25,8 +25,8 @@ from tests.mocks import (
 
 
 @pytest.fixture
-def engine() -> EpistemeEngine:
-    return EpistemeEngine(
+def engine() -> EpistemeEngineAsync:
+    return EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=MockBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -36,18 +36,21 @@ def engine() -> EpistemeEngine:
     )
 
 
-def test_engine_exception_handling() -> None:
+@pytest.mark.asyncio
+async def test_engine_exception_handling() -> None:
     """
     Edge Case: A component raises an unhandled exception.
     Result: Engine should catch it, log trace with status=ERROR, and continue to next gap (or exit).
     """
 
     class CrashingBridgeBuilder(MockBridgeBuilder):
-        def generate_hypothesis(self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None) -> BridgeResult:
+        async def generate_hypothesis(
+            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        ) -> BridgeResult:
             raise RuntimeError("Critical Failure in Bridge Builder")
 
     veritas = MockVeritasClient()
-    engine = EpistemeEngine(
+    engine = EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=CrashingBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -57,7 +60,8 @@ def test_engine_exception_handling() -> None:
     )
 
     # Run engine. It should NOT raise, because we wrapped in try/except.
-    results = engine.run("TargetX")
+    async with engine:
+        results = await engine.run("TargetX")
 
     # Should return empty results (as the gap failed)
     assert len(results) == 0

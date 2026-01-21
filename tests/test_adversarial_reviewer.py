@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
 from typing import List
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -31,17 +31,17 @@ from coreason_episteme.models import (
 
 
 @pytest.fixture
-def mock_inference_client() -> MagicMock:
-    return MagicMock()
+def mock_inference_client() -> AsyncMock:
+    return AsyncMock()
 
 
 @pytest.fixture
-def mock_search_client() -> MagicMock:
-    return MagicMock()
+def mock_search_client() -> AsyncMock:
+    return AsyncMock()
 
 
 @pytest.fixture
-def adversarial_reviewer(mock_inference_client: MagicMock, mock_search_client: MagicMock) -> AdversarialReviewerImpl:
+def adversarial_reviewer(mock_inference_client: AsyncMock, mock_search_client: AsyncMock) -> AdversarialReviewerImpl:
     strategies: List[ReviewStrategy] = [
         ToxicologyStrategy(inference_client=mock_inference_client),
         ClinicalRedundancyStrategy(inference_client=mock_inference_client),
@@ -79,10 +79,11 @@ def sample_hypothesis() -> Hypothesis:
     )
 
 
-def test_review_clean_pass(
+@pytest.mark.asyncio
+async def test_review_clean_pass(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """Test a review where no issues are found (Clean Pass)."""
@@ -93,7 +94,7 @@ def test_review_clean_pass(
     mock_search_client.find_disconfirming_evidence.return_value = []
 
     # Execute
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 0
@@ -103,10 +104,11 @@ def test_review_clean_pass(
     mock_search_client.find_disconfirming_evidence.assert_called_once()
 
 
-def test_review_toxicology_fail(
+@pytest.mark.asyncio
+async def test_review_toxicology_fail(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """Test a review where Toxicology finds risks."""
@@ -117,7 +119,7 @@ def test_review_toxicology_fail(
     mock_search_client.find_disconfirming_evidence.return_value = []
 
     # Execute
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 1
@@ -127,10 +129,11 @@ def test_review_toxicology_fail(
     assert critique.severity == CritiqueSeverity.FATAL
 
 
-def test_review_skeptic_fail(
+@pytest.mark.asyncio
+async def test_review_skeptic_fail(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """Test a review where the Scientific Skeptic finds disconfirming evidence."""
@@ -143,7 +146,7 @@ def test_review_skeptic_fail(
     ]
 
     # Execute
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 1
@@ -158,10 +161,11 @@ def test_review_skeptic_fail(
     )
 
 
-def test_review_multiple_critiques(
+@pytest.mark.asyncio
+async def test_review_multiple_critiques(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """Test a review where multiple reviewers find issues."""
@@ -172,7 +176,7 @@ def test_review_multiple_critiques(
     mock_search_client.find_disconfirming_evidence.return_value = ["Contradictory Study Z"]
 
     # Execute
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 4

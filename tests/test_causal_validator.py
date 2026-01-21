@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -22,18 +22,19 @@ from coreason_episteme.models import (
 
 
 @pytest.fixture
-def mock_inference_client() -> MagicMock:
-    return MagicMock()
+def mock_inference_client() -> AsyncMock:
+    return AsyncMock()
 
 
 @pytest.fixture
-def causal_validator(mock_inference_client: MagicMock) -> CausalValidatorImpl:
+def causal_validator(mock_inference_client: AsyncMock) -> CausalValidatorImpl:
     return CausalValidatorImpl(inference_client=mock_inference_client)
 
 
-def test_validate_success(
+@pytest.mark.asyncio
+async def test_validate_success(
     causal_validator: CausalValidatorImpl,
-    mock_inference_client: MagicMock,
+    mock_inference_client: AsyncMock,
 ) -> None:
     """Test successful hypothesis validation."""
     # Setup hypothesis
@@ -60,7 +61,7 @@ def test_validate_success(
     mock_inference_client.run_counterfactual_simulation.return_value = 0.85
 
     # Execute
-    validated_hypothesis = causal_validator.validate(hypothesis)
+    validated_hypothesis = await causal_validator.validate(hypothesis)
 
     # Verify
     assert validated_hypothesis.causal_validation_score == 0.85
