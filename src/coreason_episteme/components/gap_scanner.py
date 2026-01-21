@@ -45,7 +45,7 @@ class GapScannerImpl:
     search_client: SearchClient
     similarity_threshold: float = field(default_factory=lambda: settings.GAP_SCANNER_SIMILARITY_THRESHOLD)
 
-    def scan(self, target: str) -> List[KnowledgeGap]:
+    async def scan(self, target: str) -> List[KnowledgeGap]:
         """
         Scans for knowledge gaps (Negative Space Analysis).
 
@@ -65,7 +65,7 @@ class GapScannerImpl:
 
         # 1. Cluster Analysis
         logger.debug(f"Querying GraphNexus for disconnected clusters for {target}...")
-        raw_clusters = self.graph_client.find_disconnected_clusters({"target": target})
+        raw_clusters = await self.graph_client.find_disconnected_clusters({"target": target})
         logger.debug(f"Found {len(raw_clusters)} potential disconnected cluster pairs.")
 
         for pair in raw_clusters:
@@ -75,7 +75,7 @@ class GapScannerImpl:
             cluster_b_name = pair.get("cluster_b_name", "Unknown")
 
             if cluster_a_id and cluster_b_id:
-                similarity = self.codex_client.get_semantic_similarity(cluster_a_id, cluster_b_id)
+                similarity = await self.codex_client.get_semantic_similarity(cluster_a_id, cluster_b_id)
                 if similarity >= self.similarity_threshold:
                     logger.info(
                         f"Found disconnect with high similarity ({similarity}): {cluster_a_name} <-> {cluster_b_name}"
@@ -94,7 +94,7 @@ class GapScannerImpl:
 
         # 2. Literature Discrepancy
         logger.debug(f"Searching for literature inconsistencies for {target}...")
-        lit_gaps = self.search_client.find_literature_inconsistency(target)
+        lit_gaps = await self.search_client.find_literature_inconsistency(target)
         if lit_gaps:
             logger.info(f"Found {len(lit_gaps)} literature inconsistencies.")
             gaps.extend(lit_gaps)

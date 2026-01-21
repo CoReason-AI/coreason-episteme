@@ -52,7 +52,7 @@ class ToxicologyStrategy:
 
     inference_client: InferenceClient
 
-    def review(self, hypothesis: Hypothesis) -> List[Critique]:
+    async def review(self, hypothesis: Hypothesis) -> List[Critique]:
         """
         Runs the toxicology screen and returns critiques.
 
@@ -63,7 +63,7 @@ class ToxicologyStrategy:
             List[Critique]: A list of critiques related to toxicology.
         """
         logger.debug(f"Running Toxicology Screen for {hypothesis.target_candidate.symbol}...")
-        tox_risks = self.inference_client.run_toxicology_screen(hypothesis.target_candidate)
+        tox_risks = await self.inference_client.run_toxicology_screen(hypothesis.target_candidate)
         if tox_risks:
             logger.info(f"Toxicology risks found: {len(tox_risks)}")
             return _format_critiques(tox_risks, "Toxicologist", CritiqueSeverity.FATAL)
@@ -84,7 +84,7 @@ class ClinicalRedundancyStrategy:
 
     inference_client: InferenceClient
 
-    def review(self, hypothesis: Hypothesis) -> List[Critique]:
+    async def review(self, hypothesis: Hypothesis) -> List[Critique]:
         """
         Checks for clinical redundancy and returns critiques.
 
@@ -95,7 +95,7 @@ class ClinicalRedundancyStrategy:
             List[Critique]: A list of critiques related to clinical redundancy.
         """
         logger.debug("Checking Clinical Redundancy...")
-        redundancies = self.inference_client.check_clinical_redundancy(
+        redundancies = await self.inference_client.check_clinical_redundancy(
             hypothesis.proposed_mechanism, hypothesis.target_candidate
         )
         if redundancies:
@@ -117,7 +117,7 @@ class PatentStrategy:
 
     search_client: SearchClient
 
-    def review(self, hypothesis: Hypothesis) -> List[Critique]:
+    async def review(self, hypothesis: Hypothesis) -> List[Critique]:
         """
         Checks for patent conflicts and returns critiques.
 
@@ -128,7 +128,7 @@ class PatentStrategy:
             List[Critique]: A list of critiques related to patent issues.
         """
         logger.debug("Checking Patent Infringement...")
-        patents = self.search_client.check_patent_infringement(
+        patents = await self.search_client.check_patent_infringement(
             hypothesis.target_candidate, hypothesis.proposed_mechanism
         )
         if patents:
@@ -150,7 +150,7 @@ class ScientificSkepticStrategy:
 
     search_client: SearchClient
 
-    def review(self, hypothesis: Hypothesis) -> List[Critique]:
+    async def review(self, hypothesis: Hypothesis) -> List[Critique]:
         """
         Searches for disconfirming evidence and returns critiques.
 
@@ -166,7 +166,7 @@ class ScientificSkepticStrategy:
         object_context = hypothesis.knowledge_gap
         action = "affect"
 
-        disconfirming_evidence = self.search_client.find_disconfirming_evidence(
+        disconfirming_evidence = await self.search_client.find_disconfirming_evidence(
             subject=subject, object=object_context, action=action
         )
 

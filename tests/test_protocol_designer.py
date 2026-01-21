@@ -41,11 +41,12 @@ def sample_hypothesis() -> Hypothesis:
     )
 
 
-def test_design_experiment_populates_pico(
+@pytest.mark.asyncio
+async def test_design_experiment_populates_pico(
     protocol_designer: ProtocolDesignerImpl, sample_hypothesis: Hypothesis
 ) -> None:
     """Test that the experiment design populates the PICO fields correctly."""
-    result = protocol_designer.design_experiment(sample_hypothesis)
+    result = await protocol_designer.design_experiment(sample_hypothesis)
 
     assert result.killer_experiment_pico is not None
     pico = result.killer_experiment_pico
@@ -62,9 +63,10 @@ def test_design_experiment_populates_pico(
     assert "Mechanism Y" in pico.outcome
 
 
-def test_design_experiment_returns_hypothesis(
+@pytest.mark.asyncio
+async def test_design_experiment_returns_hypothesis(
     protocol_designer: ProtocolDesignerImpl, sample_hypothesis: Hypothesis
 ) -> None:
     """Test that the method returns the modified hypothesis object."""
-    result = protocol_designer.design_experiment(sample_hypothesis)
+    result = await protocol_designer.design_experiment(sample_hypothesis)
     assert result is sample_hypothesis

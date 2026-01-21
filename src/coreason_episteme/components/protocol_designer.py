@@ -22,7 +22,7 @@ from coreason_episteme.utils.logger import logger
 class ProtocolDesignerImpl:
     """Implementation of the Protocol Designer (The Experimentalist)."""
 
-    def design_experiment(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def design_experiment(self, hypothesis: Hypothesis) -> Hypothesis:
         """
         Designs the "Killer Experiment" (PICO) to validate the hypothesis.
 

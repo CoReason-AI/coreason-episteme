@@ -37,7 +37,7 @@ class AdversarialReviewerImpl:
 
     strategies: List[ReviewStrategy] = field(default_factory=list)
 
-    def review(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def review(self, hypothesis: Hypothesis) -> Hypothesis:
         """
         Conducts an adversarial review of the hypothesis.
 
@@ -55,7 +55,7 @@ class AdversarialReviewerImpl:
         critiques: list[Critique] = []
 
         for strategy in self.strategies:
-            critiques.extend(strategy.review(hypothesis))
+            critiques.extend(await strategy.review(hypothesis))
 
         # Append to hypothesis
         hypothesis.critiques.extend(critiques)

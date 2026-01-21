@@ -11,7 +11,7 @@
 
 import pytest
 
-from coreason_episteme.engine import EpistemeEngine
+from coreason_episteme.engine import EpistemeEngineAsync
 from tests.mocks import (
     MockAdversarialReviewer,
     MockBridgeBuilder,
@@ -28,9 +28,9 @@ def mock_veritas() -> MockVeritasClient:
 
 
 @pytest.fixture
-def engine(mock_veritas: MockVeritasClient) -> EpistemeEngine:
+def engine(mock_veritas: MockVeritasClient) -> EpistemeEngineAsync:
     # Attempt to inject veritas_client - this will fail until EpistemeEngine is updated
-    return EpistemeEngine(
+    return EpistemeEngineAsync(
         gap_scanner=MockGapScanner(),
         bridge_builder=MockBridgeBuilder(),
         causal_validator=MockCausalValidator(),
@@ -40,9 +40,11 @@ def engine(mock_veritas: MockVeritasClient) -> EpistemeEngine:
     )
 
 
-def test_engine_lifecycle_logging(engine: EpistemeEngine, mock_veritas: MockVeritasClient) -> None:
+@pytest.mark.asyncio
+async def test_engine_lifecycle_logging(engine: EpistemeEngineAsync, mock_veritas: MockVeritasClient) -> None:
     """Test that engine logs all lifecycle events in a single consolidated trace."""
-    results = engine.run("TargetX")
+    async with engine:
+        results = await engine.run("TargetX")
     assert len(results) == 1
     hypothesis_id = results[0].id
 
