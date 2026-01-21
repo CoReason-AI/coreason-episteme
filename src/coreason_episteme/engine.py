@@ -8,84 +8,207 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from typing import List
+"""
+Core Engine module for coreason-episteme.
 
+This module contains the `EpistemeEngineAsync` class, which orchestrates the
+primary "Scan-Bridge-Simulate-Critique" workflow loop.
+"""
+
+from dataclasses import dataclass, field
+from types import TracebackType
+from typing import List, Optional, Type
+
+from coreason_episteme.config import settings
 from coreason_episteme.interfaces import (
     AdversarialReviewer,
     BridgeBuilder,
     CausalValidator,
     GapScanner,
     ProtocolDesigner,
+    VeritasClient,
 )
-from coreason_episteme.models import Hypothesis
+from coreason_episteme.models import CritiqueSeverity, Hypothesis, HypothesisTrace
 from coreason_episteme.utils.logger import logger
 
 
-class EpistemeEngine:
+@dataclass
+class EpistemeEngineAsync:
     """
     The Hypothesis Engine (Theorist).
-    Orchestrates the Scan-Bridge-Simulate-Critique loop.
+
+    Orchestrates the Scan-Bridge-Simulate-Critique loop to generate and validate
+    scientific hypotheses. It manages the lifecycle of hypothesis generation,
+    from identifying gaps to refining candidates based on adversarial feedback.
+
+    Attributes:
+        gap_scanner: Component to identify knowledge gaps (Negative Space Analysis).
+        bridge_builder: Component to propose hypotheses bridging gaps (Latent Bridging).
+        causal_validator: Component to simulate and validate mechanisms (Causal Simulation).
+        adversarial_reviewer: Component to critique hypotheses (Adversarial Review).
+        protocol_designer: Component to design validation experiments (Protocol Design).
+        veritas_client: Client for logging provenance traces.
+        max_retries: Maximum number of refinement attempts for a single gap.
     """
 
-    def __init__(
-        self,
-        gap_scanner: GapScanner,
-        bridge_builder: BridgeBuilder,
-        causal_validator: CausalValidator,
-        adversarial_reviewer: AdversarialReviewer,
-        protocol_designer: ProtocolDesigner,
-    ):
-        self.gap_scanner = gap_scanner
-        self.bridge_builder = bridge_builder
-        self.causal_validator = causal_validator
-        self.adversarial_reviewer = adversarial_reviewer
-        self.protocol_designer = protocol_designer
+    gap_scanner: GapScanner
+    bridge_builder: BridgeBuilder
+    causal_validator: CausalValidator
+    adversarial_reviewer: AdversarialReviewer
+    protocol_designer: ProtocolDesigner
+    veritas_client: VeritasClient
+    max_retries: int = field(default_factory=lambda: settings.MAX_RETRIES)
 
-    def run(self, disease_id: str) -> List[Hypothesis]:
+    async def __aenter__(self) -> "EpistemeEngineAsync":
+        # Placeholder for resource initialization if needed
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        # Placeholder for resource cleanup if needed
+        pass
+
+    async def run(self, disease_id: str) -> List[Hypothesis]:
         """
         Executes the hypothesis generation pipeline for a given disease ID.
 
-        1. Scan for Knowledge Gaps.
-        2. Generate Hypotheses (Bridge the Gaps).
-        3. Validate (Causal Simulation).
-        4. Adversarial Review (Critique).
-        5. Protocol Design (Experiment).
+        Pipeline Steps:
+        1. **Gap Scanning:** Identify disconnected clusters or literature inconsistencies.
+        2. **Refinement Loop:** For each gap:
+            a. **Latent Bridging:** Propose a target/mechanism to bridge the gap.
+            b. **Causal Simulation:** Validate the mechanism via counterfactuals.
+            c. **Adversarial Review:** Critique the hypothesis (Toxicology, IP, etc.).
+            d. **Refinement:** If FATAL critiques occur, exclude the target and retry (up to max_retries).
+            e. **Protocol Design:** Design a PICO experiment for successful hypotheses.
+        3. **Provenance:** Log the full trace of the generation process via Veritas.
+
+        Args:
+            disease_id: The identifier of the disease or condition to investigate.
+
+        Returns:
+            List[Hypothesis]: A list of validated and critiqued Hypothesis objects.
         """
         logger.info(f"Starting Episteme Engine for: {disease_id}")
         results: List[Hypothesis] = []
 
         # 1. Gap Scanning
-        gaps = self.gap_scanner.scan(disease_id)
+        gaps = await self.gap_scanner.scan(disease_id)
         if not gaps:
             logger.info("No knowledge gaps found. Exiting.")
             return []
 
         for gap in gaps:
-            # 2. Latent Bridging
-            hypothesis = self.bridge_builder.generate_hypothesis(gap)
-            if not hypothesis:
-                continue
+            excluded_targets: List[str] = []
+            attempts = 0
 
-            # 3. Causal Simulation
-            hypothesis = self.causal_validator.validate(hypothesis)
+            # Initialize Trace
+            trace = HypothesisTrace(gap=gap, gap_id=gap.id, status="PENDING")
 
-            # Filtering Policy: Discard if causal plausibility is too low.
-            # Assuming a threshold of 0.5 for "Plausible" enough to proceed.
-            if hypothesis.causal_validation_score < 0.5:
-                logger.info(
-                    f"Hypothesis {hypothesis.id} discarded due to low causal score "
-                    f"({hypothesis.causal_validation_score})."
+            try:
+                while attempts < self.max_retries:
+                    attempts += 1
+                    trace.excluded_targets_history = list(excluded_targets)  # Update history
+                    trace.refinement_retries = attempts - 1
+
+                    logger.info(
+                        f"Attempt {attempts}/{self.max_retries} for gap: {gap.description[:50]}... "
+                        f"(Excluded: {len(excluded_targets)})"
+                    )
+
+                    # 2. Latent Bridging
+                    bridge_result = await self.bridge_builder.generate_hypothesis(
+                        gap, excluded_targets=excluded_targets
+                    )
+
+                    # Accumulate bridge metadata
+                    trace.bridges_found_count = bridge_result.bridges_found_count
+                    trace.considered_candidates = bridge_result.considered_candidates
+
+                    hypothesis = bridge_result.hypothesis
+                    if not hypothesis:
+                        logger.info("No hypothesis generated for gap.")
+                        trace.status = "DISCARDED (No Bridge)"
+                        break
+
+                    # Link trace ID to hypothesis ID if available
+                    trace.hypothesis_id = hypothesis.id
+                    # Use the ensembl_id of the target as the bridge_id
+                    trace.bridge_id = hypothesis.target_candidate.ensembl_id
+
+                    # 3. Causal Simulation
+                    hypothesis = await self.causal_validator.validate(hypothesis)
+
+                    # Accumulate validation data
+                    trace.causal_validation_score = hypothesis.causal_validation_score
+                    trace.key_counterfactual = hypothesis.key_counterfactual
+
+                    # Filtering Policy: Discard if causal plausibility is too low.
+                    if hypothesis.causal_validation_score < 0.5:
+                        logger.info(
+                            f"Hypothesis {hypothesis.id} discarded due to low causal score "
+                            f"({hypothesis.causal_validation_score})."
+                        )
+                        trace.status = "DISCARDED (Low Causal Score)"
+                        break
+
+                    # 4. Adversarial Review
+                    hypothesis = await self.adversarial_reviewer.review(hypothesis)
+
+                    # Accumulate critiques
+                    trace.critiques = hypothesis.critiques
+
+                    # 5. Refinement Check
+                    fatal_critiques = [c for c in hypothesis.critiques if c.severity == CritiqueSeverity.FATAL]
+                    if fatal_critiques:
+                        target_symbol = hypothesis.target_candidate.symbol
+                        logger.warning(
+                            f"Hypothesis {hypothesis.id} rejected due to FATAL critiques ({len(fatal_critiques)}). "
+                            f"Refining loop -> Excluding {target_symbol}"
+                        )
+                        excluded_targets.append(target_symbol)
+                        continue
+                    else:
+                        # Success!
+                        # 6. Protocol Design
+                        hypothesis = await self.protocol_designer.design_experiment(hypothesis)
+
+                        trace.result = hypothesis
+                        trace.status = "ACCEPTED"
+
+                        # Log the final trace
+                        if trace.hypothesis_id:
+                            await self.veritas_client.log_trace(
+                                trace.hypothesis_id,
+                                trace.model_dump(),
+                            )
+
+                        results.append(hypothesis)
+                        break  # Move to next gap
+
+                # If loop exhausted without success or broke early
+                if trace.status != "ACCEPTED":
+                    # Log trace for failed attempt if we have an ID
+                    # If we never got a hypothesis ID (e.g. no bridges), we generate a UUID or use None
+                    # The interface requires hypothesis_id: str.
+                    log_id = trace.hypothesis_id or f"failed-gap-{gap.id}"
+                    await self.veritas_client.log_trace(
+                        log_id,
+                        trace.model_dump(),
+                    )
+
+            except Exception as e:
+                logger.exception(f"Error processing gap {gap.description}: {e}")
+                trace.status = f"ERROR: {str(e)}"
+                log_id = trace.hypothesis_id or f"error-gap-{gap.id}"
+                await self.veritas_client.log_trace(
+                    log_id,
+                    trace.model_dump(),
                 )
                 continue
-
-            # 4. Adversarial Review
-            hypothesis = self.adversarial_reviewer.review(hypothesis)
-
-            # 5. Protocol Design
-            # Only design experiments for surviving hypotheses
-            hypothesis = self.protocol_designer.design_experiment(hypothesis)
-
-            results.append(hypothesis)
 
         logger.info(f"Engine finished. Generated {len(results)} hypotheses.")
         return results

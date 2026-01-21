@@ -22,77 +22,79 @@ from coreason_episteme.interfaces import (
     SearchClient,
     VeritasClient,
 )
-from coreason_episteme.models import GeneticTarget, Hypothesis, KnowledgeGap
+from coreason_episteme.models import BridgeResult, GeneticTarget, Hypothesis, KnowledgeGap
 
 
 class MockGraphNexusClient:
-    def find_disconnected_clusters(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def find_disconnected_clusters(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
         return []
 
-    def find_latent_bridges(self, source_cluster_id: str, target_cluster_id: str) -> List[GeneticTarget]:
+    async def find_latent_bridges(self, source_cluster_id: str, target_cluster_id: str) -> List[GeneticTarget]:
         return []
 
 
 class MockInferenceClient:
-    def run_counterfactual_simulation(self, mechanism: str, intervention_target: str) -> float:
+    async def run_counterfactual_simulation(self, mechanism: str, intervention_target: str) -> float:
         return 0.5
 
-    def run_toxicology_screen(self, target_candidate: GeneticTarget) -> List[str]:
+    async def run_toxicology_screen(self, target_candidate: GeneticTarget) -> List[str]:
         return []
 
-    def check_clinical_redundancy(self, mechanism: str, target_candidate: GeneticTarget) -> List[str]:
+    async def check_clinical_redundancy(self, mechanism: str, target_candidate: GeneticTarget) -> List[str]:
         return []
 
 
 class MockCodexClient:
-    def get_semantic_similarity(self, entity1: str, entity2: str) -> float:
+    async def get_semantic_similarity(self, entity1: str, entity2: str) -> float:
         return 0.8
 
-    def validate_target(self, symbol: str) -> Optional[GeneticTarget]:
+    async def validate_target(self, symbol: str) -> Optional[GeneticTarget]:
         return None
 
 
 class MockPrismClient:
-    def check_druggability(self, target_id: str) -> float:
+    async def check_druggability(self, target_id: str) -> float:
         return 0.9
 
 
 class MockSearchClient:
-    def find_literature_inconsistency(self, topic: str) -> List[KnowledgeGap]:
+    async def find_literature_inconsistency(self, topic: str) -> List[KnowledgeGap]:
         return []
 
-    def verify_citation(self, interaction_claim: str) -> bool:
+    async def verify_citation(self, interaction_claim: str) -> bool:
         return True
 
-    def check_patent_infringement(self, target_candidate: GeneticTarget, mechanism: str) -> List[str]:
+    async def check_patent_infringement(self, target_candidate: GeneticTarget, mechanism: str) -> List[str]:
         return []
 
-    def find_disconfirming_evidence(self, subject: str, object: str, action: str) -> List[str]:
+    async def find_disconfirming_evidence(self, subject: str, object: str, action: str) -> List[str]:
         return []
 
 
 class MockVeritasClient:
-    def log_trace(self, hypothesis_id: str, trace_data: Dict[str, Any]) -> None:
+    async def log_trace(self, hypothesis_id: str, trace_data: Dict[str, Any]) -> None:
         pass
 
 
 class MockGapScanner:
-    def scan(self, target: str) -> List[KnowledgeGap]:
+    async def scan(self, target: str) -> List[KnowledgeGap]:
         return []
 
 
 class MockBridgeBuilder:
-    def generate_hypothesis(self, gap: KnowledgeGap) -> Optional[Hypothesis]:
-        return None
+    async def generate_hypothesis(
+        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+    ) -> BridgeResult:
+        return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
 
 class MockCausalValidator:
-    def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def validate(self, hypothesis: Hypothesis) -> Hypothesis:
         return hypothesis
 
 
 class MockProtocolDesigner:
-    def design_experiment(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def design_experiment(self, hypothesis: Hypothesis) -> Hypothesis:
         return hypothesis
 
 

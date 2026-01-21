@@ -8,84 +8,54 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from coreason_episteme.interfaces import InferenceClient, SearchClient
-from coreason_episteme.models import Hypothesis
+"""
+Adversarial Reviewer component implementation.
+
+This module implements the `AdversarialReviewerImpl`, which aggregates multiple
+review strategies to critique generated hypotheses.
+"""
+
+from dataclasses import dataclass, field
+from typing import List
+
+from coreason_episteme.components.strategies import ReviewStrategy
+from coreason_episteme.models import Critique, Hypothesis
 from coreason_episteme.utils.logger import logger
 
 
+@dataclass
 class AdversarialReviewerImpl:
     """
     Implementation of the Adversarial Reviewer (The Council).
 
-    Orchestrates reviews from:
-    1. The Toxicologist (Safety risks)
-    2. The Clinician (Redundancy)
-    3. The IP Strategist (Patent infringement)
+    Orchestrates reviews from various strategies to critique the hypothesis
+    from multiple perspectives (Toxicology, Clinical, IP, etc.).
+
+    Attributes:
+        strategies: A list of ReviewStrategy implementations to apply.
     """
 
-    def __init__(self, inference_client: InferenceClient, search_client: SearchClient):
-        self.inference_client = inference_client
-        self.search_client = search_client
+    strategies: List[ReviewStrategy] = field(default_factory=list)
 
-    def review(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def review(self, hypothesis: Hypothesis) -> Hypothesis:
         """
         Conducts an adversarial review of the hypothesis.
-        Aggregates critiques and appends them to the hypothesis.
+
+        Iterates through all configured strategies, aggregates their critiques,
+        and appends them to the hypothesis.
+
+        Args:
+            hypothesis: The hypothesis to review.
+
+        Returns:
+            Hypothesis: The hypothesis object with appended critiques.
         """
         logger.info(f"Convening Review Board for hypothesis: {hypothesis.id}")
 
-        critiques = []
+        critiques: list[Critique] = []
 
-        # 1. The Toxicologist (Inference)
-        logger.debug(f"Running Toxicology Screen for {hypothesis.target_candidate.symbol}...")
-        tox_risks = self.inference_client.run_toxicology_screen(hypothesis.target_candidate)
-        if tox_risks:
-            formatted_risks = [f"[Toxicologist] {risk}" for risk in tox_risks]
-            critiques.extend(formatted_risks)
-            logger.info(f"Toxicology risks found: {len(tox_risks)}")
-
-        # 2. The Clinician (Inference)
-        logger.debug("Checking Clinical Redundancy...")
-        redundancies = self.inference_client.check_clinical_redundancy(
-            hypothesis.proposed_mechanism, hypothesis.target_candidate
-        )
-        if redundancies:
-            formatted_redundancies = [f"[Clinician] {item}" for item in redundancies]
-            critiques.extend(formatted_redundancies)
-            logger.info(f"Clinical redundancies found: {len(redundancies)}")
-
-        # 3. The IP Strategist (Search)
-        logger.debug("Checking Patent Infringement...")
-        patents = self.search_client.check_patent_infringement(
-            hypothesis.target_candidate, hypothesis.proposed_mechanism
-        )
-        if patents:
-            formatted_patents = [f"[IP Strategist] Potential conflict: {patent}" for patent in patents]
-            critiques.extend(formatted_patents)
-            logger.info(f"Patent conflicts found: {len(patents)}")
-
-        # 4. The Scientific Skeptic (Strict Null Hypothesis)
-        logger.debug("Searching for Disconfirming Evidence (Null Hypothesis Check)...")
-        # Attempt to parse subject/object from hypothesis or use best-effort mapping
-        # Subject: Intervention Target
-        # Object: Disease/Outcome (from knowledge gap or mechanism context)
-        # Action: "regulate" or "affect"
-        subject = hypothesis.target_candidate.symbol
-        # We try to extract the object from the mechanism or gap description.
-        # For robustness, we'll use the mechanism summary as the context.
-        object_context = hypothesis.knowledge_gap
-        action = "affect"
-
-        disconfirming_evidence = self.search_client.find_disconfirming_evidence(
-            subject=subject, object=object_context, action=action
-        )
-
-        if disconfirming_evidence:
-            formatted_skepticism = [
-                f"[Scientific Skeptic] Disconfirming evidence found: {evidence}" for evidence in disconfirming_evidence
-            ]
-            critiques.extend(formatted_skepticism)
-            logger.info(f"Disconfirming evidence found: {len(disconfirming_evidence)}")
+        for strategy in self.strategies:
+            critiques.extend(await strategy.review(hypothesis))
 
         # Append to hypothesis
         hypothesis.critiques.extend(critiques)

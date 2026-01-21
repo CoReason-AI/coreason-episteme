@@ -8,18 +8,27 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-import uuid
-from typing import Optional
+"""
+Bridge Builder component implementation.
 
+This module implements the `BridgeBuilderImpl`, responsible for generating
+hypotheses by finding latent bridges in the knowledge graph.
+"""
+
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, cast
+
+from coreason_episteme.config import settings
 from coreason_episteme.interfaces import (
     CodexClient,
     GraphNexusClient,
     PrismClient,
     SearchClient,
-    VeritasClient,
 )
 from coreason_episteme.models import (
     PICO,
+    BridgeResult,
     ConfidenceLevel,
     Hypothesis,
     KnowledgeGap,
@@ -27,57 +36,87 @@ from coreason_episteme.models import (
 from coreason_episteme.utils.logger import logger
 
 
+@dataclass
 class BridgeBuilderImpl:
-    """Implementation of the Bridge Builder (Hypothesis Formulator)."""
+    """
+    Implementation of the Bridge Builder (Hypothesis Formulator).
 
-    def __init__(
-        self,
-        graph_client: GraphNexusClient,
-        prism_client: PrismClient,
-        codex_client: CodexClient,
-        search_client: SearchClient,
-        veritas_client: VeritasClient,
-    ):
-        self.graph_client = graph_client
-        self.prism_client = prism_client
-        self.codex_client = codex_client
-        self.search_client = search_client
-        self.veritas_client = veritas_client
+    Generates hypotheses by finding "Latent Bridges" between disconnected concepts
+    in the Knowledge Graph. It ensures targets are druggable and citation-backed.
 
-    def generate_hypothesis(self, gap: KnowledgeGap) -> Optional[Hypothesis]:
+    Attributes:
+        graph_client: Client for GraphNexus (Traversals).
+        prism_client: Client for Prism (Druggability).
+        codex_client: Client for Codex (Ontology).
+        search_client: Client for Search (Hallucination Check).
+        druggability_threshold: Minimum score to consider a target druggable.
+    """
+
+    graph_client: GraphNexusClient
+    prism_client: PrismClient
+    codex_client: CodexClient
+    search_client: SearchClient
+    druggability_threshold: float = field(default_factory=lambda: settings.DRUGGABILITY_THRESHOLD)
+
+    async def generate_hypothesis(
+        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+    ) -> BridgeResult:
         """
         Generates a hypothesis bridging the knowledge gap.
 
+        Process:
         1. Queries GraphNexus for latent bridges between source nodes.
-        2. Filters bridges for druggability via Prism.
-        3. Validates target via Codex.
-        4. Verifies citations via Search (Hallucination Check).
-        5. Logs trace via Veritas.
-        6. Constructs a Hypothesis.
+        2. Filters out targets listed in `excluded_targets`.
+        3. Checks druggability using `prism_client`.
+        4. Validates target details using `codex_client`.
+        5. Performs a "Hallucination Check" using `search_client` to verify citations.
+        6. Selects the best candidate (highest druggability) and constructs a Hypothesis.
+
+        Args:
+            gap: The KnowledgeGap to bridge.
+            excluded_targets: Optional list of target symbols to exclude from consideration.
+
+        Returns:
+            BridgeResult: A BridgeResult containing the hypothesis (if found) and metadata about the process.
         """
         logger.info(f"Attempting to build bridge for gap: {gap.description}")
+        if excluded_targets:
+            logger.info(f"Excluding targets: {excluded_targets}")
+
+        # Default result (failure)
+        result_metadata: Dict[str, Any] = {"bridges_found_count": 0, "considered_candidates": []}
 
         if not gap.source_nodes or len(gap.source_nodes) < 2:
             logger.warning("Gap does not have enough source nodes to find bridges.")
-            return None
+            return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
         source_id = gap.source_nodes[0]
         target_id = gap.source_nodes[1]
 
-        potential_bridges = self.graph_client.find_latent_bridges(source_id, target_id)
+        potential_bridges = await self.graph_client.find_latent_bridges(source_id, target_id)
+
+        # Populate metadata
+        result_metadata["bridges_found_count"] = len(potential_bridges)
+        result_metadata["considered_candidates"] = [b.symbol for b in potential_bridges]
+
         if not potential_bridges:
             logger.info("No latent bridges found.")
-            return None
+            return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
         best_candidate = None
         best_druggability = -1.0
 
         for bridge in potential_bridges:
+            # Check exclusions
+            if excluded_targets and bridge.symbol in excluded_targets:
+                logger.debug(f"Skipping excluded target: {bridge.symbol}")
+                continue
+
             # Check druggability
-            druggability = self.prism_client.check_druggability(bridge.ensembl_id)
-            if druggability > 0.5:  # Threshold for "druggable"
+            druggability = await self.prism_client.check_druggability(bridge.ensembl_id)
+            if druggability > self.druggability_threshold:  # Threshold for "druggable"
                 # Validate details with Codex
-                validated_target = self.codex_client.validate_target(bridge.symbol)
+                validated_target = await self.codex_client.validate_target(bridge.symbol)
                 if validated_target:
                     # Hallucination Check: Verify citation
                     # We construct a claim to verify.
@@ -85,7 +124,7 @@ class BridgeBuilderImpl:
                         f"{source_id} interacts with {validated_target.symbol} "
                         f"and {validated_target.symbol} affects {target_id}"
                     )
-                    is_verified = self.search_client.verify_citation(interaction_claim)
+                    is_verified = await self.search_client.verify_citation(interaction_claim)
 
                     if is_verified:
                         # Update with fresh data from Codex (and keep the druggability score)
@@ -99,7 +138,12 @@ class BridgeBuilderImpl:
 
         if not best_candidate:
             logger.info("No valid targets found among bridges (druggable & verified).")
-            return None
+            # Explicitly cast or assure types to satisfy mypy strictness
+            return BridgeResult(
+                hypothesis=None,
+                bridges_found_count=int(result_metadata["bridges_found_count"]),
+                considered_candidates=cast(List[str], result_metadata["considered_candidates"]),
+            )
 
         # Construct Hypothesis
         hypothesis_id = str(uuid.uuid4())
@@ -118,15 +162,9 @@ class BridgeBuilderImpl:
             confidence=ConfidenceLevel.SPECULATIVE,
         )
 
-        # Log trace
-        trace_data = {
-            "gap": gap.description,
-            "source_nodes": gap.source_nodes,
-            "bridges_found": len(potential_bridges),
-            "selected_target": best_candidate.symbol,
-            "mechanism": mechanism,
-        }
-        self.veritas_client.log_trace(hypothesis_id, trace_data)
-
         logger.info(f"Generated hypothesis: {hypothesis.id}")
-        return hypothesis
+        return BridgeResult(
+            hypothesis=hypothesis,
+            bridges_found_count=int(result_metadata["bridges_found_count"]),
+            considered_candidates=cast(List[str], result_metadata["considered_candidates"]),
+        )

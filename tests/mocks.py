@@ -9,11 +9,14 @@
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
 import uuid
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from coreason_episteme.models import (
     PICO,
+    BridgeResult,
     ConfidenceLevel,
+    Critique,
+    CritiqueSeverity,
     GeneticTarget,
     Hypothesis,
     KnowledgeGap,
@@ -25,7 +28,7 @@ from coreason_episteme.utils.logger import logger
 class MockGapScanner:
     """A mock implementation of the GapScanner for testing and development."""
 
-    def scan(self, target: str) -> List[KnowledgeGap]:
+    async def scan(self, target: str) -> List[KnowledgeGap]:
         """
         Simulates scanning for knowledge gaps.
 
@@ -53,11 +56,32 @@ class MockGapScanner:
 
 
 class MockBridgeBuilder:
-    def generate_hypothesis(self, gap: KnowledgeGap) -> Optional[Hypothesis]:
+    async def generate_hypothesis(
+        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+    ) -> BridgeResult:
         if "Unbridgeable" in gap.description:
-            return None
+            return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
-        return Hypothesis(
+        # Basic filtering simulation for mocks
+        if excluded_targets and "MOCK1" in excluded_targets:
+            # Return a backup if MOCK1 is excluded
+            hyp = Hypothesis(
+                id=str(uuid.uuid4()),
+                title="Mock Hypothesis Backup",
+                knowledge_gap=gap.description,
+                proposed_mechanism="Mock Mechanism Backup",
+                target_candidate=GeneticTarget(
+                    symbol="MOCK2", ensembl_id="ENSG000002", druggability_score=0.8, novelty_score=0.7
+                ),
+                causal_validation_score=0.0,
+                key_counterfactual="",
+                killer_experiment_pico=PICO(population="", intervention="", comparator="", outcome=""),
+                evidence_chain=[],
+                confidence=ConfidenceLevel.SPECULATIVE,
+            )
+            return BridgeResult(hypothesis=hyp, bridges_found_count=2, considered_candidates=["MOCK1", "MOCK2"])
+
+        hyp = Hypothesis(
             id=str(uuid.uuid4()),
             title="Mock Hypothesis",
             knowledge_gap=gap.description,
@@ -71,10 +95,11 @@ class MockBridgeBuilder:
             evidence_chain=[],
             confidence=ConfidenceLevel.SPECULATIVE,
         )
+        return BridgeResult(hypothesis=hyp, bridges_found_count=2, considered_candidates=["MOCK1", "MOCK2"])
 
 
 class MockCausalValidator:
-    def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def validate(self, hypothesis: Hypothesis) -> Hypothesis:
         # Simulate validation score
         if "BadTarget" in hypothesis.target_candidate.symbol:
             hypothesis.causal_validation_score = 0.1
@@ -85,14 +110,16 @@ class MockCausalValidator:
 
 
 class MockAdversarialReviewer:
-    def review(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def review(self, hypothesis: Hypothesis) -> Hypothesis:
         if "Risky" in hypothesis.target_candidate.symbol:
-            hypothesis.critiques.append("Toxicology risk detected.")
+            hypothesis.critiques.append(
+                Critique(source="Toxicologist", content="Toxicology risk detected.", severity=CritiqueSeverity.FATAL)
+            )
         return hypothesis
 
 
 class MockProtocolDesigner:
-    def design_experiment(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def design_experiment(self, hypothesis: Hypothesis) -> Hypothesis:
         hypothesis.killer_experiment_pico = PICO(
             population="Mice",
             intervention="Drug X",
@@ -100,3 +127,14 @@ class MockProtocolDesigner:
             outcome="Survival",
         )
         return hypothesis
+
+
+class MockVeritasClient:
+    """Mock Veritas Client for capturing traces."""
+
+    def __init__(self) -> None:
+        self.traces: List[Dict[str, Any]] = []
+
+    async def log_trace(self, hypothesis_id: str, trace_data: Dict[str, Any]) -> None:
+        self.traces.append({"id": hypothesis_id, "data": trace_data})
+        logger.info(f"MockVeritasClient logged trace for {hypothesis_id}: {trace_data.keys()}")

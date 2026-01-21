@@ -8,38 +8,50 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from unittest.mock import MagicMock
+from typing import List
+from unittest.mock import AsyncMock
 
 import pytest
 
 from coreason_episteme.components.adversarial_reviewer import AdversarialReviewerImpl
+from coreason_episteme.components.review_strategies import (
+    ClinicalRedundancyStrategy,
+    PatentStrategy,
+    ScientificSkepticStrategy,
+    ToxicologyStrategy,
+)
+from coreason_episteme.components.strategies import ReviewStrategy
 from coreason_episteme.models import (
     PICO,
     ConfidenceLevel,
+    CritiqueSeverity,
     GeneticTarget,
     Hypothesis,
 )
 
 
-@pytest.fixture  # type: ignore[misc]
-def mock_inference_client() -> MagicMock:
-    return MagicMock()
+@pytest.fixture
+def mock_inference_client() -> AsyncMock:
+    return AsyncMock()
 
 
-@pytest.fixture  # type: ignore[misc]
-def mock_search_client() -> MagicMock:
-    return MagicMock()
+@pytest.fixture
+def mock_search_client() -> AsyncMock:
+    return AsyncMock()
 
 
-@pytest.fixture  # type: ignore[misc]
-def adversarial_reviewer(mock_inference_client: MagicMock, mock_search_client: MagicMock) -> AdversarialReviewerImpl:
-    return AdversarialReviewerImpl(
-        inference_client=mock_inference_client,
-        search_client=mock_search_client,
-    )
+@pytest.fixture
+def adversarial_reviewer(mock_inference_client: AsyncMock, mock_search_client: AsyncMock) -> AdversarialReviewerImpl:
+    strategies: List[ReviewStrategy] = [
+        ToxicologyStrategy(inference_client=mock_inference_client),
+        ClinicalRedundancyStrategy(inference_client=mock_inference_client),
+        PatentStrategy(search_client=mock_search_client),
+        ScientificSkepticStrategy(search_client=mock_search_client),
+    ]
+    return AdversarialReviewerImpl(strategies=strategies)
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def sample_hypothesis() -> Hypothesis:
     target = GeneticTarget(
         symbol="GeneA",
@@ -67,10 +79,11 @@ def sample_hypothesis() -> Hypothesis:
     )
 
 
-def test_review_clean_pass(
+@pytest.mark.asyncio
+async def test_review_clean_pass(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """Test a review where no issues are found (Clean Pass)."""
@@ -81,7 +94,7 @@ def test_review_clean_pass(
     mock_search_client.find_disconfirming_evidence.return_value = []
 
     # Execute
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 0
@@ -91,10 +104,11 @@ def test_review_clean_pass(
     mock_search_client.find_disconfirming_evidence.assert_called_once()
 
 
-def test_review_toxicology_fail(
+@pytest.mark.asyncio
+async def test_review_toxicology_fail(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """Test a review where Toxicology finds risks."""
@@ -105,17 +119,21 @@ def test_review_toxicology_fail(
     mock_search_client.find_disconfirming_evidence.return_value = []
 
     # Execute
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 1
-    assert "[Toxicologist] Liver Toxicity Risk" in reviewed_hypothesis.critiques[0]
+    critique = reviewed_hypothesis.critiques[0]
+    assert critique.source == "Toxicologist"
+    assert critique.content == "Liver Toxicity Risk"
+    assert critique.severity == CritiqueSeverity.FATAL
 
 
-def test_review_skeptic_fail(
+@pytest.mark.asyncio
+async def test_review_skeptic_fail(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """Test a review where the Scientific Skeptic finds disconfirming evidence."""
@@ -128,12 +146,14 @@ def test_review_skeptic_fail(
     ]
 
     # Execute
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 1
-    assert "[Scientific Skeptic]" in reviewed_hypothesis.critiques[0]
-    assert "Paper X (2020)" in reviewed_hypothesis.critiques[0]
+    critique = reviewed_hypothesis.critiques[0]
+    assert critique.source == "Scientific Skeptic"
+    assert "Paper X (2020)" in critique.content
+    assert critique.severity == CritiqueSeverity.FATAL
 
     # Check arguments
     mock_search_client.find_disconfirming_evidence.assert_called_once_with(
@@ -141,10 +161,11 @@ def test_review_skeptic_fail(
     )
 
 
-def test_review_multiple_critiques(
+@pytest.mark.asyncio
+async def test_review_multiple_critiques(
     adversarial_reviewer: AdversarialReviewerImpl,
-    mock_inference_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_inference_client: AsyncMock,
+    mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
 ) -> None:
     """Test a review where multiple reviewers find issues."""
@@ -155,12 +176,14 @@ def test_review_multiple_critiques(
     mock_search_client.find_disconfirming_evidence.return_value = ["Contradictory Study Z"]
 
     # Execute
-    reviewed_hypothesis = adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 4
-    critique_texts = " ".join(reviewed_hypothesis.critiques)
-    assert "[Toxicologist]" in critique_texts
-    assert "[Clinician]" in critique_texts
-    assert "[IP Strategist]" in critique_texts
-    assert "[Scientific Skeptic]" in critique_texts
+
+    # Check severities
+    critique_map = {c.source: c.severity for c in reviewed_hypothesis.critiques}
+    assert critique_map["Toxicologist"] == CritiqueSeverity.FATAL
+    assert critique_map["Clinician"] == CritiqueSeverity.MEDIUM
+    assert critique_map["IP Strategist"] == CritiqueSeverity.HIGH
+    assert critique_map["Scientific Skeptic"] == CritiqueSeverity.FATAL

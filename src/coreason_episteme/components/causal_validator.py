@@ -8,21 +8,47 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Causal Validator component implementation.
+
+This module implements the `CausalValidatorImpl`, responsible for running
+counterfactual simulations to validate proposed hypotheses.
+"""
+
+from dataclasses import dataclass
+
 from coreason_episteme.interfaces import InferenceClient
 from coreason_episteme.models import Hypothesis
 from coreason_episteme.utils.logger import logger
 
 
+@dataclass
 class CausalValidatorImpl:
-    """Implementation of the Causal Validator (The Simulator)."""
+    """
+    Implementation of the Causal Validator (The Simulator).
 
-    def __init__(self, inference_client: InferenceClient):
-        self.inference_client = inference_client
+    Uses `coreason-inference` to run counterfactual simulations on the proposed hypothesis,
+    testing if the mechanism holds up under in-silico stress testing.
 
-    def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+    Attributes:
+        inference_client: Client for Inference service.
+    """
+
+    inference_client: InferenceClient
+
+    async def validate(self, hypothesis: Hypothesis) -> Hypothesis:
         """
         Validates the hypothesis using causal simulation.
-        Updates the hypothesis with validation score.
+
+        Runs a counterfactual simulation: "If we inhibit Target Gene [A], does it causally
+        interrupt the disease pathway [C]?".
+
+        Args:
+            hypothesis: The hypothesis to validate.
+
+        Returns:
+            Hypothesis: The hypothesis object updated with the causal validation score and
+            description of the key counterfactual tested.
         """
         logger.info(f"Validating hypothesis: {hypothesis.id}")
 
@@ -30,7 +56,7 @@ class CausalValidatorImpl:
         intervention_target = hypothesis.target_candidate.symbol
 
         # Run counterfactual simulation
-        score = self.inference_client.run_counterfactual_simulation(
+        score = await self.inference_client.run_counterfactual_simulation(
             mechanism=mechanism,
             intervention_target=intervention_target,
         )

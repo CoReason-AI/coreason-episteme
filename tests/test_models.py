@@ -42,7 +42,7 @@ def test_pico_model_invalid_missing_field() -> None:
             population="Patients",
             intervention="Drug",
             # Missing comparator
-            outcome="Health",  # type: ignore
+            outcome="Health",  # type: ignore[call-arg]
         )
 
 
@@ -65,6 +65,22 @@ def test_knowledge_gap_model_valid() -> None:
     )
     assert gap.type == KnowledgeGapType.CLUSTER_DISCONNECT
     assert gap.description == "Disconnect between Protein A and Disease B"
+    assert gap.id is not None  # ID should be auto-generated
+
+
+def test_knowledge_gap_id_generation() -> None:
+    """Test that KnowledgeGap generates unique IDs."""
+    gap1 = KnowledgeGap(
+        description="Desc1",
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
+    gap2 = KnowledgeGap(
+        description="Desc2",
+        type=KnowledgeGapType.CLUSTER_DISCONNECT,
+    )
+    assert gap1.id is not None
+    assert gap2.id is not None
+    assert gap1.id != gap2.id
 
 
 def test_knowledge_gap_model_invalid_type() -> None:
@@ -72,7 +88,7 @@ def test_knowledge_gap_model_invalid_type() -> None:
     with pytest.raises(ValidationError):
         KnowledgeGap(
             description="Bad Gap",
-            type="UNKNOWN_TYPE",  # type: ignore
+            type="UNKNOWN_TYPE",
         )
 
 
@@ -157,7 +173,7 @@ def test_hypothesis_model_invalid_nested_pico() -> None:
                 "population": "Pop",
                 "intervention": "Int",
                 # Missing comparator and outcome
-            },  # type: ignore
+            },
             evidence_chain=[],
             confidence=ConfidenceLevel.SPECULATIVE,
         )

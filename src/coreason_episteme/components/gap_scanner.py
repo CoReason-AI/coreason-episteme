@@ -8,39 +8,64 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Gap Scanner component implementation.
+
+This module implements the `GapScannerImpl`, responsible for identifying
+knowledge gaps (Negative Space Analysis) in the Knowledge Graph.
+"""
+
+from dataclasses import dataclass, field
 from typing import List
 
+from coreason_episteme.config import settings
 from coreason_episteme.interfaces import CodexClient, GraphNexusClient, SearchClient
 from coreason_episteme.models import KnowledgeGap, KnowledgeGapType
 from coreason_episteme.utils.logger import logger
 
 
+@dataclass
 class GapScannerImpl:
-    """Implementation of the GapScanner (The Void Detector)."""
+    """
+    Implementation of the GapScanner (The Void Detector).
 
-    def __init__(
-        self,
-        graph_client: GraphNexusClient,
-        codex_client: CodexClient,
-        search_client: SearchClient,
-    ):
-        self.graph_client = graph_client
-        self.codex_client = codex_client
-        self.search_client = search_client
+    Identifies "Negative Space" in the Knowledge Graph by finding disconnected
+    clusters that should be connected based on semantic similarity, or by
+    finding explicit inconsistencies in the literature.
 
-    def scan(self, target: str) -> List[KnowledgeGap]:
+    Attributes:
+        graph_client: Client for GraphNexus.
+        codex_client: Client for Codex.
+        search_client: Client for Search.
+        similarity_threshold: Threshold for semantic similarity to consider a disconnect significant.
+    """
+
+    graph_client: GraphNexusClient
+    codex_client: CodexClient
+    search_client: SearchClient
+    similarity_threshold: float = field(default_factory=lambda: settings.GAP_SCANNER_SIMILARITY_THRESHOLD)
+
+    async def scan(self, target: str) -> List[KnowledgeGap]:
         """
         Scans for knowledge gaps (Negative Space Analysis).
 
-        1. Cluster Analysis: Finds disconnected subgraphs with high semantic similarity (>= 0.75).
-        2. Literature Discrepancy: Finds inconsistencies via Search.
+        Steps:
+        1. Cluster Analysis: Finds disconnected subgraphs in GraphNexus.
+           Checks semantic similarity via Codex.
+        2. Literature Discrepancy: Queries SearchClient for inconsistencies.
+
+        Args:
+            target: The disease or biological entity to scan for.
+
+        Returns:
+            List[KnowledgeGap]: A list of KnowledgeGap objects representing identified gaps.
         """
         logger.info(f"Scanning for knowledge gaps related to {target}...")
         gaps: List[KnowledgeGap] = []
 
         # 1. Cluster Analysis
         logger.debug(f"Querying GraphNexus for disconnected clusters for {target}...")
-        raw_clusters = self.graph_client.find_disconnected_clusters({"target": target})
+        raw_clusters = await self.graph_client.find_disconnected_clusters({"target": target})
         logger.debug(f"Found {len(raw_clusters)} potential disconnected cluster pairs.")
 
         for pair in raw_clusters:
@@ -50,8 +75,8 @@ class GapScannerImpl:
             cluster_b_name = pair.get("cluster_b_name", "Unknown")
 
             if cluster_a_id and cluster_b_id:
-                similarity = self.codex_client.get_semantic_similarity(cluster_a_id, cluster_b_id)
-                if similarity >= 0.75:
+                similarity = await self.codex_client.get_semantic_similarity(cluster_a_id, cluster_b_id)
+                if similarity >= self.similarity_threshold:
                     logger.info(
                         f"Found disconnect with high similarity ({similarity}): {cluster_a_name} <-> {cluster_b_name}"
                     )
@@ -69,7 +94,7 @@ class GapScannerImpl:
 
         # 2. Literature Discrepancy
         logger.debug(f"Searching for literature inconsistencies for {target}...")
-        lit_gaps = self.search_client.find_literature_inconsistency(target)
+        lit_gaps = await self.search_client.find_literature_inconsistency(target)
         if lit_gaps:
             logger.info(f"Found {len(lit_gaps)} literature inconsistencies.")
             gaps.extend(lit_gaps)

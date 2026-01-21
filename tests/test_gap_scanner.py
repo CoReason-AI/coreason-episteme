@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -23,21 +23,24 @@ def test_interface_definition() -> None:
     assert GapScanner is not None
 
 
-def test_mock_gap_scanner_scan_found() -> None:
+@pytest.mark.asyncio
+async def test_mock_gap_scanner_scan_found() -> None:
     """Test that the MockGapScanner returns a gap when one is expected."""
     scanner = MockGapScanner()
-    gaps = scanner.scan("DiseaseX")
+    gaps = await scanner.scan("DiseaseX")
 
     assert len(gaps) == 1
     assert isinstance(gaps[0], KnowledgeGap)
+    assert gaps[0].id is not None  # Verify ID is generated
     assert "DiseaseX" in gaps[0].description
     assert gaps[0].source_nodes == ["PMID:123456", "PMID:789012"]
 
 
-def test_mock_gap_scanner_scan_not_found() -> None:
+@pytest.mark.asyncio
+async def test_mock_gap_scanner_scan_not_found() -> None:
     """Test that the MockGapScanner returns an empty list for 'CleanTarget'."""
     scanner = MockGapScanner()
-    gaps = scanner.scan("CleanTarget")
+    gaps = await scanner.scan("CleanTarget")
 
     assert len(gaps) == 0
 
@@ -45,26 +48,26 @@ def test_mock_gap_scanner_scan_not_found() -> None:
 # --- GapScannerImpl Tests ---
 
 
-@pytest.fixture  # type: ignore[misc]
-def mock_graph_client() -> MagicMock:
-    return MagicMock()
+@pytest.fixture
+def mock_graph_client() -> AsyncMock:
+    return AsyncMock()
 
 
-@pytest.fixture  # type: ignore[misc]
-def mock_codex_client() -> MagicMock:
-    return MagicMock()
+@pytest.fixture
+def mock_codex_client() -> AsyncMock:
+    return AsyncMock()
 
 
-@pytest.fixture  # type: ignore[misc]
-def mock_search_client() -> MagicMock:
-    return MagicMock()
+@pytest.fixture
+def mock_search_client() -> AsyncMock:
+    return AsyncMock()
 
 
-@pytest.fixture  # type: ignore[misc]
+@pytest.fixture
 def gap_scanner_impl(
-    mock_graph_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> GapScannerImpl:
     return GapScannerImpl(
         graph_client=mock_graph_client,
@@ -73,11 +76,12 @@ def gap_scanner_impl(
     )
 
 
-def test_scan_cluster_gap_found(
+@pytest.mark.asyncio
+async def test_scan_cluster_gap_found(
     gap_scanner_impl: GapScannerImpl,
-    mock_graph_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """Test that a gap is created when clusters are found with high similarity."""
     # Setup
@@ -93,11 +97,12 @@ def test_scan_cluster_gap_found(
     mock_search_client.find_literature_inconsistency.return_value = []
 
     # Execute
-    gaps = gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX")
 
     # Verify
     assert len(gaps) == 1
     gap = gaps[0]
+    assert gap.id is not None  # Verify ID is generated
     assert gap.type == KnowledgeGapType.CLUSTER_DISCONNECT
     assert "Cluster A" in gap.description
     assert "Cluster B" in gap.description
@@ -107,11 +112,12 @@ def test_scan_cluster_gap_found(
     mock_codex_client.get_semantic_similarity.assert_called_with("ID_A", "ID_B")
 
 
-def test_scan_cluster_gap_filtered_low_similarity(
+@pytest.mark.asyncio
+async def test_scan_cluster_gap_filtered_low_similarity(
     gap_scanner_impl: GapScannerImpl,
-    mock_graph_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """Test that no gap is created when similarity is low."""
     # Setup
@@ -127,17 +133,18 @@ def test_scan_cluster_gap_filtered_low_similarity(
     mock_search_client.find_literature_inconsistency.return_value = []
 
     # Execute
-    gaps = gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX")
 
     # Verify
     assert len(gaps) == 0
 
 
-def test_scan_literature_gap_found(
+@pytest.mark.asyncio
+async def test_scan_literature_gap_found(
     gap_scanner_impl: GapScannerImpl,
-    mock_graph_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """Test that literature inconsistencies are returned."""
     # Setup
@@ -150,7 +157,7 @@ def test_scan_literature_gap_found(
     mock_search_client.find_literature_inconsistency.return_value = [lit_gap]
 
     # Execute
-    gaps = gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX")
 
     # Verify
     assert len(gaps) == 1
@@ -158,11 +165,12 @@ def test_scan_literature_gap_found(
     mock_search_client.find_literature_inconsistency.assert_called_with("TargetX")
 
 
-def test_scan_combined_results(
+@pytest.mark.asyncio
+async def test_scan_combined_results(
     gap_scanner_impl: GapScannerImpl,
-    mock_graph_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """Test that results from both sources are combined."""
     # Setup
@@ -176,7 +184,7 @@ def test_scan_combined_results(
     mock_search_client.find_literature_inconsistency.return_value = [lit_gap]
 
     # Execute
-    gaps = gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX")
 
     # Verify
     assert len(gaps) == 2
@@ -185,10 +193,11 @@ def test_scan_combined_results(
     assert KnowledgeGapType.LITERATURE_INCONSISTENCY in types
 
 
-def test_scan_malformed_cluster_data(
+@pytest.mark.asyncio
+async def test_scan_malformed_cluster_data(
     gap_scanner_impl: GapScannerImpl,
-    mock_graph_client: MagicMock,
-    mock_codex_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_codex_client: AsyncMock,
 ) -> None:
     """Test handling of clusters missing IDs."""
     # Setup
@@ -197,35 +206,37 @@ def test_scan_malformed_cluster_data(
     ]
 
     # Execute
-    gaps = gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX")
 
     # Verify
     assert len(gaps) == 0
     mock_codex_client.get_semantic_similarity.assert_not_called()
 
 
-def test_scan_boundary_condition(
+@pytest.mark.asyncio
+async def test_scan_boundary_condition(
     gap_scanner_impl: GapScannerImpl,
-    mock_graph_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """Test boundary condition where similarity is exactly 0.75."""
     mock_graph_client.find_disconnected_clusters.return_value = [{"cluster_a_id": "A", "cluster_b_id": "B"}]
     mock_codex_client.get_semantic_similarity.return_value = 0.75
     mock_search_client.find_literature_inconsistency.return_value = []
 
-    gaps = gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX")
 
     assert len(gaps) == 1
     assert gaps[0].type == KnowledgeGapType.CLUSTER_DISCONNECT
 
 
-def test_scan_robustness_malformed_data(
+@pytest.mark.asyncio
+async def test_scan_robustness_malformed_data(
     gap_scanner_impl: GapScannerImpl,
-    mock_graph_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """Test robustness against malformed data (None, empty strings)."""
     mock_graph_client.find_disconnected_clusters.return_value = [
@@ -236,17 +247,18 @@ def test_scan_robustness_malformed_data(
     ]
     mock_search_client.find_literature_inconsistency.return_value = []
 
-    gaps = gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX")
 
     assert len(gaps) == 0
     mock_codex_client.get_semantic_similarity.assert_not_called()
 
 
-def test_scan_complex_scenario(
+@pytest.mark.asyncio
+async def test_scan_complex_scenario(
     gap_scanner_impl: GapScannerImpl,
-    mock_graph_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """Test a complex scenario with mixed valid/invalid clusters and search results."""
     mock_graph_client.find_disconnected_clusters.return_value = [
@@ -268,18 +280,19 @@ def test_scan_complex_scenario(
         KnowledgeGap(description="Lit Gap", type=KnowledgeGapType.LITERATURE_INCONSISTENCY, source_nodes=["PMID:1"])
     ]
 
-    gaps = gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX")
 
     assert len(gaps) == 2
     assert any(g.type == KnowledgeGapType.CLUSTER_DISCONNECT for g in gaps)
     assert any(g.type == KnowledgeGapType.LITERATURE_INCONSISTENCY for g in gaps)
 
 
-def test_scan_duplicate_symmetry(
+@pytest.mark.asyncio
+async def test_scan_duplicate_symmetry(
     gap_scanner_impl: GapScannerImpl,
-    mock_graph_client: MagicMock,
-    mock_codex_client: MagicMock,
-    mock_search_client: MagicMock,
+    mock_graph_client: AsyncMock,
+    mock_codex_client: AsyncMock,
+    mock_search_client: AsyncMock,
 ) -> None:
     """
     Test behavior when symmetric pairs (A-B and B-A) are returned.
@@ -292,7 +305,7 @@ def test_scan_duplicate_symmetry(
     mock_codex_client.get_semantic_similarity.return_value = 0.9
     mock_search_client.find_literature_inconsistency.return_value = []
 
-    gaps = gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX")
 
     assert len(gaps) == 2
     assert gaps[0].source_nodes == ["A", "B"]
