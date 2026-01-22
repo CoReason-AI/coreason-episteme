@@ -8,10 +8,22 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
+"""
+Logging configuration for the coreason-episteme application.
+
+This module configures the `loguru` logger with two sinks:
+1. Standard Error (Stderr) for human-readable console output.
+2. File sink (`logs/app.log`) for structured JSON logging with rotation and retention.
+
+The log level is determined by the `LOG_LEVEL` setting in `coreason_episteme.config.settings`.
+"""
+
 import sys
 from pathlib import Path
 
 from loguru import logger
+
+from coreason_episteme.config import settings
 
 __all__ = ["logger"]
 
@@ -21,7 +33,7 @@ logger.remove()
 # Sink 1: Stdout (Human-readable)
 logger.add(
     sys.stderr,
-    level="INFO",
+    level=settings.LOG_LEVEL,
     format=(
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
         "<level>{level: <8}</level> | "
@@ -42,5 +54,5 @@ logger.add(
     retention="10 days",
     serialize=True,
     enqueue=True,
-    level="INFO",
+    level=settings.LOG_LEVEL,
 )
