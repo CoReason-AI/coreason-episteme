@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from types import TracebackType
 from typing import List, Optional, Type
 
+from coreason_identity.models import UserContext
+
 from coreason_episteme.config import settings
 from coreason_episteme.interfaces import (
     AdversarialReviewer,
@@ -72,7 +74,7 @@ class EpistemeEngineAsync:
         # Placeholder for resource cleanup if needed
         pass
 
-    async def run(self, disease_id: str) -> List[Hypothesis]:
+    async def run(self, disease_id: str, *, context: UserContext) -> List[Hypothesis]:
         """
         Executes the hypothesis generation pipeline for a given disease ID.
 
@@ -88,15 +90,23 @@ class EpistemeEngineAsync:
 
         Args:
             disease_id: The identifier of the disease or condition to investigate.
+            context: The user context triggering the process.
 
         Returns:
             List[Hypothesis]: A list of validated and critiqued Hypothesis objects.
         """
-        logger.info(f"Starting Episteme Engine for: {disease_id}")
+        if context is None:
+            raise ValueError("context is required")
+
+        logger.info(
+            f"Starting Episteme Engine for: {disease_id}",
+            user_id=context.sub,
+            protocol_title=disease_id,
+        )
         results: List[Hypothesis] = []
 
         # 1. Gap Scanning
-        gaps = await self.gap_scanner.scan(disease_id)
+        gaps = await self.gap_scanner.scan(disease_id, context=context)
         if not gaps:
             logger.info("No knowledge gaps found. Exiting.")
             return []
@@ -121,7 +131,7 @@ class EpistemeEngineAsync:
 
                     # 2. Latent Bridging
                     bridge_result = await self.bridge_builder.generate_hypothesis(
-                        gap, excluded_targets=excluded_targets
+                        gap, context=context, excluded_targets=excluded_targets
                     )
 
                     # Accumulate bridge metadata
@@ -140,7 +150,7 @@ class EpistemeEngineAsync:
                     trace.bridge_id = hypothesis.target_candidate.ensembl_id
 
                     # 3. Causal Simulation
-                    hypothesis = await self.causal_validator.validate(hypothesis)
+                    hypothesis = await self.causal_validator.validate(hypothesis, context=context)
 
                     # Accumulate validation data
                     trace.causal_validation_score = hypothesis.causal_validation_score
@@ -156,7 +166,7 @@ class EpistemeEngineAsync:
                         break
 
                     # 4. Adversarial Review
-                    hypothesis = await self.adversarial_reviewer.review(hypothesis)
+                    hypothesis = await self.adversarial_reviewer.review(hypothesis, context=context)
 
                     # Accumulate critiques
                     trace.critiques = hypothesis.critiques

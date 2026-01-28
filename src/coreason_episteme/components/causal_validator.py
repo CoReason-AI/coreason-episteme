@@ -17,6 +17,8 @@ counterfactual simulations to validate proposed hypotheses.
 
 from dataclasses import dataclass
 
+from coreason_identity.models import UserContext
+
 from coreason_episteme.interfaces import InferenceClient
 from coreason_episteme.models import Hypothesis
 from coreason_episteme.utils.logger import logger
@@ -36,7 +38,7 @@ class CausalValidatorImpl:
 
     inference_client: InferenceClient
 
-    async def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def validate(self, hypothesis: Hypothesis, context: UserContext) -> Hypothesis:
         """
         Validates the hypothesis using causal simulation.
 
@@ -45,12 +47,16 @@ class CausalValidatorImpl:
 
         Args:
             hypothesis: The hypothesis to validate.
+            context: The user context triggering the validation.
 
         Returns:
             Hypothesis: The hypothesis object updated with the causal validation score and
             description of the key counterfactual tested.
         """
-        logger.info(f"Validating hypothesis: {hypothesis.id}")
+        logger.info(
+            f"Validating hypothesis: {hypothesis.id}",
+            user_id=context.sub,
+        )
 
         mechanism = hypothesis.proposed_mechanism
         intervention_target = hypothesis.target_candidate.symbol

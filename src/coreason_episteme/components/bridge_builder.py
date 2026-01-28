@@ -19,6 +19,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, cast
 
+from coreason_identity.models import UserContext
+
 from coreason_episteme.config import settings
 from coreason_episteme.interfaces import (
     CodexClient,
@@ -59,7 +61,7 @@ class BridgeBuilderImpl:
     druggability_threshold: float = field(default_factory=lambda: settings.DRUGGABILITY_THRESHOLD)
 
     async def generate_hypothesis(
-        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        self, gap: KnowledgeGap, context: UserContext, excluded_targets: Optional[List[str]] = None
     ) -> BridgeResult:
         """
         Generates a hypothesis bridging the knowledge gap.
@@ -74,12 +76,16 @@ class BridgeBuilderImpl:
 
         Args:
             gap: The KnowledgeGap to bridge.
+            context: The user context triggering the generation.
             excluded_targets: Optional list of target symbols to exclude from consideration.
 
         Returns:
             BridgeResult: A BridgeResult containing the hypothesis (if found) and metadata about the process.
         """
-        logger.info(f"Attempting to build bridge for gap: {gap.description}")
+        logger.info(
+            f"Attempting to build bridge for gap: {gap.description}",
+            user_id=context.sub,
+        )
         if excluded_targets:
             logger.info(f"Excluding targets: {excluded_targets}")
 

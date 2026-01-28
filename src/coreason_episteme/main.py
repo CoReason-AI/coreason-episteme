@@ -20,6 +20,7 @@ from typing import Any, List, Optional, Type
 
 import anyio
 import httpx
+from coreason_identity.models import UserContext
 
 from coreason_episteme.components.adversarial_reviewer import AdversarialReviewerImpl
 from coreason_episteme.components.bridge_builder import BridgeBuilderImpl
@@ -135,11 +136,11 @@ class EpistemeAsync:
         # Ensure engine resources are cleaned up if any
         await self.engine.__aexit__(exc_type, exc_val, exc_tb)
 
-    async def run(self, disease_id: str) -> List[Hypothesis]:
+    async def run(self, disease_id: str, *, context: UserContext) -> List[Hypothesis]:
         """
         Executes the hypothesis generation pipeline.
         """
-        return await self.engine.run(disease_id)
+        return await self.engine.run(disease_id, context=context)
 
 
 class Episteme:
@@ -171,11 +172,15 @@ class Episteme:
     def __exit__(self, *args: Any) -> None:
         anyio.run(self._async.__aexit__, *args)
 
-    def run(self, disease_id: str) -> List[Hypothesis]:
+    def run(self, disease_id: str, *, context: UserContext) -> List[Hypothesis]:
         """
         Executes the hypothesis generation pipeline (blocking).
         """
-        return anyio.run(self._async.run, disease_id)
+
+        async def _run() -> List[Hypothesis]:
+            return await self._async.run(disease_id, context=context)
+
+        return anyio.run(_run)
 
 
 def generate_hypothesis(
@@ -186,6 +191,7 @@ def generate_hypothesis(
     prism_client: Optional[PrismClient] = None,
     inference_client: Optional[InferenceClient] = None,
     veritas_client: Optional[VeritasClient] = None,
+    context: Optional[UserContext] = None,
 ) -> List[Hypothesis]:
     """
     Main entry point for generating scientific hypotheses for a given disease.
@@ -207,6 +213,14 @@ def generate_hypothesis(
     if veritas_client is None:
         raise RuntimeError("Missing required external client: VeritasClient")
 
+    if context is None:
+        context = UserContext(
+            sub="cli-user",
+            email="cli@coreason.ai",
+            permissions=["system"],
+            project_context="cli",
+        )
+
     with Episteme(
         graph_client=graph_client,
         codex_client=codex_client,
@@ -215,4 +229,4 @@ def generate_hypothesis(
         inference_client=inference_client,
         veritas_client=veritas_client,
     ) as service:
-        return service.run(disease_id)
+        return service.run(disease_id, context=context)

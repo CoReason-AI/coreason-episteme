@@ -11,6 +11,7 @@
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_episteme.components.bridge_builder import BridgeBuilderImpl
 from coreason_episteme.components.gap_scanner import GapScannerImpl
@@ -44,12 +45,22 @@ class TestIntegrationConfigOverrides:
     def mock_prism_client(self) -> Mock:
         return AsyncMock(spec=PrismClient)
 
+    @pytest.fixture
+    def user_context(self) -> UserContext:
+        return UserContext(
+            sub="test-user",
+            email="test@coreason.ai",
+            permissions=[],
+            project_context="test",
+        )
+
     @pytest.mark.asyncio
     async def test_gap_scanner_similarity_threshold_override(
         self,
         mock_graph_client: Mock,
         mock_codex_client: Mock,
         mock_search_client: Mock,
+        user_context: UserContext,
     ) -> None:
         """
         Verify that changing GAP_SCANNER_SIMILARITY_THRESHOLD affects which clusters are considered connected.
@@ -76,7 +87,7 @@ class TestIntegrationConfigOverrides:
             search_client=mock_search_client,
             similarity_threshold=0.75,
         )
-        gaps_strict = await scanner_strict.scan("DiseaseX")
+        gaps_strict = await scanner_strict.scan("DiseaseX", context=user_context)
         assert len(gaps_strict) == 0
 
         # Case 2: Lowered Threshold (0.5) -> Should find 1 gap (0.6 >= 0.5)
@@ -86,7 +97,7 @@ class TestIntegrationConfigOverrides:
             search_client=mock_search_client,
             similarity_threshold=0.5,
         )
-        gaps_lax = await scanner_lax.scan("DiseaseX")
+        gaps_lax = await scanner_lax.scan("DiseaseX", context=user_context)
         assert len(gaps_lax) == 1
         assert gaps_lax[0].type == KnowledgeGapType.CLUSTER_DISCONNECT
 
@@ -97,6 +108,7 @@ class TestIntegrationConfigOverrides:
         mock_prism_client: Mock,
         mock_codex_client: Mock,
         mock_search_client: Mock,
+        user_context: UserContext,
     ) -> None:
         """
         Verify that changing DRUGGABILITY_THRESHOLD affects which candidates are selected.
@@ -130,7 +142,7 @@ class TestIntegrationConfigOverrides:
             search_client=mock_search_client,
             druggability_threshold=0.5,
         )
-        result_strict = await builder_strict.generate_hypothesis(gap)
+        result_strict = await builder_strict.generate_hypothesis(gap, context=user_context)
         assert result_strict.hypothesis is None
         assert result_strict.bridges_found_count == 1  # It found it, but filtered it
 
@@ -142,6 +154,6 @@ class TestIntegrationConfigOverrides:
             search_client=mock_search_client,
             druggability_threshold=0.3,
         )
-        result_lax = await builder_lax.generate_hypothesis(gap)
+        result_lax = await builder_lax.generate_hypothesis(gap, context=user_context)
         assert result_lax.hypothesis is not None
         assert result_lax.hypothesis.target_candidate.symbol == candidate_symbol
