@@ -298,9 +298,7 @@ async def test_generate_hypothesis_excluded_targets(
     mock_search_client.verify_citation.return_value = True
 
     # Exclude ToxicGene
-    result = await bridge_builder.generate_hypothesis(
-        gap, context=user_context, excluded_targets=["ToxicGene"]
-    )
+    result = await bridge_builder.generate_hypothesis(gap, context=user_context, excluded_targets=["ToxicGene"])
 
     assert result.hypothesis is not None
     assert result.hypothesis.target_candidate.symbol == "SafeGene"

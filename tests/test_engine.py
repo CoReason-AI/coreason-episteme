@@ -207,4 +207,4 @@ async def test_engine_run_bridge_failure(engine: EpistemeEngineAsync, user_conte
 async def test_engine_missing_context(engine: EpistemeEngineAsync) -> None:
     """Test that missing context raises ValueError."""
     with pytest.raises(ValueError, match="context is required"):
-        await engine.run("TargetX", context=None)  # type: ignore
+        await engine.run("TargetX", context=None)
