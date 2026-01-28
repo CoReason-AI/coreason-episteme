@@ -10,6 +10,8 @@
 
 from typing import Any, Dict, List, Optional
 
+from coreason_identity.models import UserContext
+
 from coreason_episteme.interfaces import (
     BridgeBuilder,
     CausalValidator,
@@ -77,19 +79,19 @@ class MockVeritasClient:
 
 
 class MockGapScanner:
-    async def scan(self, target: str) -> List[KnowledgeGap]:
+    async def scan(self, target: str, context: UserContext) -> List[KnowledgeGap]:
         return []
 
 
 class MockBridgeBuilder:
     async def generate_hypothesis(
-        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        self, gap: KnowledgeGap, context: UserContext, excluded_targets: Optional[List[str]] = None
     ) -> BridgeResult:
         return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
 
 class MockCausalValidator:
-    async def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def validate(self, hypothesis: Hypothesis, context: UserContext) -> Hypothesis:
         return hypothesis
 
 

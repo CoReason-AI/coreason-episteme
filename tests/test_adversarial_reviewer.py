@@ -12,6 +12,7 @@ from typing import List
 from unittest.mock import AsyncMock
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_episteme.components.adversarial_reviewer import AdversarialReviewerImpl
 from coreason_episteme.components.review_strategies import (
@@ -38,6 +39,16 @@ def mock_inference_client() -> AsyncMock:
 @pytest.fixture
 def mock_search_client() -> AsyncMock:
     return AsyncMock()
+
+
+@pytest.fixture
+def user_context() -> UserContext:
+    return UserContext(
+        sub="test-user",
+        email="test@coreason.ai",
+        permissions=[],
+        project_context="test",
+    )
 
 
 @pytest.fixture
@@ -85,6 +96,7 @@ async def test_review_clean_pass(
     mock_inference_client: AsyncMock,
     mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """Test a review where no issues are found (Clean Pass)."""
     # Setup mocks to return empty lists (no issues)
@@ -94,7 +106,7 @@ async def test_review_clean_pass(
     mock_search_client.find_disconfirming_evidence.return_value = []
 
     # Execute
-    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis, context=user_context)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 0
@@ -110,6 +122,7 @@ async def test_review_toxicology_fail(
     mock_inference_client: AsyncMock,
     mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """Test a review where Toxicology finds risks."""
     # Setup mocks
@@ -119,7 +132,7 @@ async def test_review_toxicology_fail(
     mock_search_client.find_disconfirming_evidence.return_value = []
 
     # Execute
-    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis, context=user_context)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 1
@@ -135,6 +148,7 @@ async def test_review_skeptic_fail(
     mock_inference_client: AsyncMock,
     mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """Test a review where the Scientific Skeptic finds disconfirming evidence."""
     # Setup mocks
@@ -146,7 +160,7 @@ async def test_review_skeptic_fail(
     ]
 
     # Execute
-    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis, context=user_context)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 1
@@ -167,6 +181,7 @@ async def test_review_multiple_critiques(
     mock_inference_client: AsyncMock,
     mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """Test a review where multiple reviewers find issues."""
     # Setup mocks
@@ -176,7 +191,7 @@ async def test_review_multiple_critiques(
     mock_search_client.find_disconfirming_evidence.return_value = ["Contradictory Study Z"]
 
     # Execute
-    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis, context=user_context)
 
     # Verify
     assert len(reviewed_hypothesis.critiques) == 4

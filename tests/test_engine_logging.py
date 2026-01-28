@@ -10,6 +10,7 @@
 
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_episteme.engine import EpistemeEngineAsync
 from tests.mocks import (
@@ -28,6 +29,16 @@ def mock_veritas() -> MockVeritasClient:
 
 
 @pytest.fixture
+def user_context() -> UserContext:
+    return UserContext(
+        sub="test-user",
+        email="test@coreason.ai",
+        permissions=[],
+        project_context="test",
+    )
+
+
+@pytest.fixture
 def engine(mock_veritas: MockVeritasClient) -> EpistemeEngineAsync:
     # Attempt to inject veritas_client - this will fail until EpistemeEngine is updated
     return EpistemeEngineAsync(
@@ -41,10 +52,12 @@ def engine(mock_veritas: MockVeritasClient) -> EpistemeEngineAsync:
 
 
 @pytest.mark.asyncio
-async def test_engine_lifecycle_logging(engine: EpistemeEngineAsync, mock_veritas: MockVeritasClient) -> None:
+async def test_engine_lifecycle_logging(
+    engine: EpistemeEngineAsync, mock_veritas: MockVeritasClient, user_context: UserContext
+) -> None:
     """Test that engine logs all lifecycle events in a single consolidated trace."""
     async with engine:
-        results = await engine.run("TargetX")
+        results = await engine.run("TargetX", context=user_context)
     assert len(results) == 1
     hypothesis_id = results[0].id
 

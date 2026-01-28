@@ -18,6 +18,8 @@ knowledge gaps (Negative Space Analysis) in the Knowledge Graph.
 from dataclasses import dataclass, field
 from typing import List
 
+from coreason_identity.models import UserContext
+
 from coreason_episteme.config import settings
 from coreason_episteme.interfaces import CodexClient, GraphNexusClient, SearchClient
 from coreason_episteme.models import KnowledgeGap, KnowledgeGapType
@@ -45,7 +47,7 @@ class GapScannerImpl:
     search_client: SearchClient
     similarity_threshold: float = field(default_factory=lambda: settings.GAP_SCANNER_SIMILARITY_THRESHOLD)
 
-    async def scan(self, target: str) -> List[KnowledgeGap]:
+    async def scan(self, target: str, context: UserContext) -> List[KnowledgeGap]:
         """
         Scans for knowledge gaps (Negative Space Analysis).
 
@@ -56,11 +58,15 @@ class GapScannerImpl:
 
         Args:
             target: The disease or biological entity to scan for.
+            context: The user context triggering the scan.
 
         Returns:
             List[KnowledgeGap]: A list of KnowledgeGap objects representing identified gaps.
         """
-        logger.info(f"Scanning for knowledge gaps related to {target}...")
+        logger.info(
+            f"Scanning for knowledge gaps related to {target}...",
+            user_id=context.sub,
+        )
         gaps: List[KnowledgeGap] = []
 
         # 1. Cluster Analysis

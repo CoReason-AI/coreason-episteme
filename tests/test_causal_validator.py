@@ -11,6 +11,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_episteme.components.causal_validator import CausalValidatorImpl
 from coreason_episteme.models import (
@@ -27,6 +28,16 @@ def mock_inference_client() -> AsyncMock:
 
 
 @pytest.fixture
+def user_context() -> UserContext:
+    return UserContext(
+        sub="test-user",
+        email="test@coreason.ai",
+        permissions=[],
+        project_context="test",
+    )
+
+
+@pytest.fixture
 def causal_validator(mock_inference_client: AsyncMock) -> CausalValidatorImpl:
     return CausalValidatorImpl(inference_client=mock_inference_client)
 
@@ -35,6 +46,7 @@ def causal_validator(mock_inference_client: AsyncMock) -> CausalValidatorImpl:
 async def test_validate_success(
     causal_validator: CausalValidatorImpl,
     mock_inference_client: AsyncMock,
+    user_context: UserContext,
 ) -> None:
     """Test successful hypothesis validation."""
     # Setup hypothesis
@@ -61,7 +73,7 @@ async def test_validate_success(
     mock_inference_client.run_counterfactual_simulation.return_value = 0.85
 
     # Execute
-    validated_hypothesis = await causal_validator.validate(hypothesis)
+    validated_hypothesis = await causal_validator.validate(hypothesis, context=user_context)
 
     # Verify
     assert validated_hypothesis.causal_validation_score == 0.85
