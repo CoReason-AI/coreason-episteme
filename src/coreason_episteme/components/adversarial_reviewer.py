@@ -18,6 +18,8 @@ review strategies to critique generated hypotheses.
 from dataclasses import dataclass, field
 from typing import List
 
+from coreason_identity.models import UserContext
+
 from coreason_episteme.components.strategies import ReviewStrategy
 from coreason_episteme.models import Critique, Hypothesis
 from coreason_episteme.utils.logger import logger
@@ -37,7 +39,7 @@ class AdversarialReviewerImpl:
 
     strategies: List[ReviewStrategy] = field(default_factory=list)
 
-    async def review(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def review(self, hypothesis: Hypothesis, context: UserContext) -> Hypothesis:
         """
         Conducts an adversarial review of the hypothesis.
 
@@ -46,11 +48,15 @@ class AdversarialReviewerImpl:
 
         Args:
             hypothesis: The hypothesis to review.
+            context: The user context triggering the review.
 
         Returns:
             Hypothesis: The hypothesis object with appended critiques.
         """
-        logger.info(f"Convening Review Board for hypothesis: {hypothesis.id}")
+        logger.info(
+            f"Convening Review Board for hypothesis: {hypothesis.id}",
+            user_id=context.sub,
+        )
 
         critiques: list[Critique] = []
 

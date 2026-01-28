@@ -12,6 +12,7 @@ from typing import List
 from unittest.mock import AsyncMock
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_episteme.components.adversarial_reviewer import AdversarialReviewerImpl
 from coreason_episteme.components.review_strategies import (
@@ -37,6 +38,16 @@ def mock_inference_client() -> AsyncMock:
 @pytest.fixture
 def mock_search_client() -> AsyncMock:
     return AsyncMock()
+
+
+@pytest.fixture
+def user_context() -> UserContext:
+    return UserContext(
+        sub="test-user",
+        email="test@coreason.ai",
+        permissions=[],
+        project_context="test",
+    )
 
 
 @pytest.fixture
@@ -85,6 +96,7 @@ async def test_review_service_returns_none(
     mock_inference_client: AsyncMock,
     mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """
     Test Edge Case: Service returns None instead of empty list.
@@ -95,7 +107,7 @@ async def test_review_service_returns_none(
     mock_inference_client.check_clinical_redundancy.return_value = None
     mock_search_client.check_patent_infringement.return_value = None
 
-    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis, context=user_context)
 
     # Should have 0 critiques, not crash
     assert len(reviewed_hypothesis.critiques) == 0
@@ -107,6 +119,7 @@ async def test_review_high_volume_critiques(
     mock_inference_client: AsyncMock,
     mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """
     Test Complex Scenario: Large number of critiques.
@@ -117,7 +130,7 @@ async def test_review_high_volume_critiques(
     mock_inference_client.check_clinical_redundancy.return_value = [f"Redundancy {i}" for i in range(50)]
     mock_search_client.check_patent_infringement.return_value = [f"Patent {i}" for i in range(50)]
 
-    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis, context=user_context)
 
     # Should have 150 critiques
     assert len(reviewed_hypothesis.critiques) == 150
@@ -131,6 +144,7 @@ async def test_review_exception_propagation(
     adversarial_reviewer: AdversarialReviewerImpl,
     mock_inference_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """
     Test Edge Case: Service raises an exception.
@@ -139,7 +153,7 @@ async def test_review_exception_propagation(
     mock_inference_client.run_toxicology_screen.side_effect = RuntimeError("Service Down")
 
     with pytest.raises(RuntimeError, match="Service Down"):
-        await adversarial_reviewer.review(sample_hypothesis)
+        await adversarial_reviewer.review(sample_hypothesis, context=user_context)
 
 
 @pytest.mark.asyncio
@@ -148,6 +162,7 @@ async def test_review_cumulative_critiques(
     mock_inference_client: AsyncMock,
     mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """
     Test State: Calling review multiple times appends critiques.
@@ -158,13 +173,13 @@ async def test_review_cumulative_critiques(
     mock_inference_client.check_clinical_redundancy.return_value = []
     mock_search_client.check_patent_infringement.return_value = []
 
-    hypo_v1 = await adversarial_reviewer.review(sample_hypothesis)
+    hypo_v1 = await adversarial_reviewer.review(sample_hypothesis, context=user_context)
     assert len(hypo_v1.critiques) == 1
 
     # Second run (maybe different results?)
     mock_inference_client.run_toxicology_screen.return_value = ["Risk B"]
 
-    hypo_v2 = await adversarial_reviewer.review(hypo_v1)
+    hypo_v2 = await adversarial_reviewer.review(hypo_v1, context=user_context)
 
     # Should have 2 critiques now (Risk A + Risk B)
     assert len(hypo_v2.critiques) == 2
@@ -178,6 +193,7 @@ async def test_review_scientific_skeptic_failure_handling(
     mock_inference_client: AsyncMock,
     mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """
     Test Edge Case: Scientific Skeptic returns None or invalid data.
@@ -190,7 +206,7 @@ async def test_review_scientific_skeptic_failure_handling(
     # Simulate None return from search client
     mock_search_client.find_disconfirming_evidence.return_value = None
 
-    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis, context=user_context)
 
     # Should have 0 critiques
     assert len(reviewed_hypothesis.critiques) == 0
@@ -202,6 +218,7 @@ async def test_review_all_reviewers_trigger(
     mock_inference_client: AsyncMock,
     mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """
     Test Complex Scenario: Every single reviewer finds an issue.
@@ -212,7 +229,7 @@ async def test_review_all_reviewers_trigger(
     mock_search_client.check_patent_infringement.return_value = ["Patent Breach"]
     mock_search_client.find_disconfirming_evidence.return_value = ["Paper says NO"]
 
-    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis, context=user_context)
 
     assert len(reviewed_hypothesis.critiques) == 4
 
@@ -229,6 +246,7 @@ async def test_review_empty_strings_robustness(
     mock_inference_client: AsyncMock,
     mock_search_client: AsyncMock,
     sample_hypothesis: Hypothesis,
+    user_context: UserContext,
 ) -> None:
     """
     Test Edge Case: Empty strings in hypothesis fields used for search.
@@ -242,7 +260,7 @@ async def test_review_empty_strings_robustness(
     sample_hypothesis.target_candidate.symbol = ""
     sample_hypothesis.knowledge_gap = ""
 
-    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis)
+    reviewed_hypothesis = await adversarial_reviewer.review(sample_hypothesis, context=user_context)
 
     # Verify call was still made with empty strings
     mock_search_client.find_disconfirming_evidence.assert_called_once_with(subject="", object="", action="affect")

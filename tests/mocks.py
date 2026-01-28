@@ -11,6 +11,8 @@
 import uuid
 from typing import Any, Dict, List, Optional
 
+from coreason_identity.models import UserContext
+
 from coreason_episteme.models import (
     PICO,
     BridgeResult,
@@ -28,12 +30,13 @@ from coreason_episteme.utils.logger import logger
 class MockGapScanner:
     """A mock implementation of the GapScanner for testing and development."""
 
-    async def scan(self, target: str) -> List[KnowledgeGap]:
+    async def scan(self, target: str, context: UserContext) -> List[KnowledgeGap]:
         """
         Simulates scanning for knowledge gaps.
 
         Args:
             target: The disease or entity ID.
+            context: User context.
 
         Returns:
             A list containing a mock KnowledgeGap, or empty list if target is 'CleanTarget'.
@@ -57,7 +60,7 @@ class MockGapScanner:
 
 class MockBridgeBuilder:
     async def generate_hypothesis(
-        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        self, gap: KnowledgeGap, context: UserContext, excluded_targets: Optional[List[str]] = None
     ) -> BridgeResult:
         if "Unbridgeable" in gap.description:
             return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
@@ -99,7 +102,7 @@ class MockBridgeBuilder:
 
 
 class MockCausalValidator:
-    async def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def validate(self, hypothesis: Hypothesis, context: UserContext) -> Hypothesis:
         # Simulate validation score
         if "BadTarget" in hypothesis.target_candidate.symbol:
             hypothesis.causal_validation_score = 0.1
@@ -110,7 +113,7 @@ class MockCausalValidator:
 
 
 class MockAdversarialReviewer:
-    async def review(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def review(self, hypothesis: Hypothesis, context: UserContext) -> Hypothesis:
         if "Risky" in hypothesis.target_candidate.symbol:
             hypothesis.critiques.append(
                 Critique(source="Toxicologist", content="Toxicology risk detected.", severity=CritiqueSeverity.FATAL)

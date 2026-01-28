@@ -12,6 +12,7 @@ import uuid
 from typing import List, Optional
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_episteme.engine import EpistemeEngineAsync
 from coreason_episteme.models import (
@@ -47,8 +48,18 @@ def engine() -> EpistemeEngineAsync:
     )
 
 
+@pytest.fixture
+def user_context() -> UserContext:
+    return UserContext(
+        sub="test-user",
+        email="test@coreason.ai",
+        permissions=[],
+        project_context="test",
+    )
+
+
 @pytest.mark.asyncio
-async def test_refinement_max_retries_exceeded() -> None:
+async def test_refinement_max_retries_exceeded(user_context: UserContext) -> None:
     """
     Edge Case: The system keeps finding toxic targets until max_retries is hit.
     Result: Should return empty list (failed to find safe hypothesis).
@@ -56,7 +67,7 @@ async def test_refinement_max_retries_exceeded() -> None:
 
     class InfiniteToxicBridgeBuilder(MockBridgeBuilder):
         async def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+            self, gap: KnowledgeGap, context: UserContext, excluded_targets: Optional[List[str]] = None
         ) -> BridgeResult:
             # Always return a new Toxic target
             unique_id = uuid.uuid4().hex[:6]
@@ -91,12 +102,12 @@ async def test_refinement_max_retries_exceeded() -> None:
     )
 
     async with engine:
-        results = await engine.run("TargetX")
+        results = await engine.run("TargetX", context=user_context)
     assert len(results) == 0
 
 
 @pytest.mark.asyncio
-async def test_refinement_candidate_exhaustion() -> None:
+async def test_refinement_candidate_exhaustion(user_context: UserContext) -> None:
     """
     Edge Case: BridgeBuilder runs out of candidates before max_retries.
     Result: Should return empty list.
@@ -104,7 +115,7 @@ async def test_refinement_candidate_exhaustion() -> None:
 
     class ExhaustibleBridgeBuilder(MockBridgeBuilder):
         async def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+            self, gap: KnowledgeGap, context: UserContext, excluded_targets: Optional[List[str]] = None
         ) -> BridgeResult:
             # If any target is excluded, assume we ran out of options
             if excluded_targets:
@@ -142,12 +153,12 @@ async def test_refinement_candidate_exhaustion() -> None:
     )
 
     async with engine:
-        results = await engine.run("TargetX")
+        results = await engine.run("TargetX", context=user_context)
     assert len(results) == 0
 
 
 @pytest.mark.asyncio
-async def test_complex_severity_threshold() -> None:
+async def test_complex_severity_threshold(user_context: UserContext) -> None:
     """
     Complex Scenario: "The Unicorn Hunt"
     1. Candidate A -> Toxic (FATAL) -> Refine
@@ -157,7 +168,7 @@ async def test_complex_severity_threshold() -> None:
 
     class UnicornBridgeBuilder(MockBridgeBuilder):
         async def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+            self, gap: KnowledgeGap, context: UserContext, excluded_targets: Optional[List[str]] = None
         ) -> BridgeResult:
             excluded = excluded_targets or []
 
@@ -188,7 +199,7 @@ async def test_complex_severity_threshold() -> None:
             return BridgeResult(hypothesis=hyp, bridges_found_count=1, considered_candidates=[target.symbol])
 
     class ComplexReviewer(MockAdversarialReviewer):
-        async def review(self, hypothesis: Hypothesis) -> Hypothesis:
+        async def review(self, hypothesis: Hypothesis, context: UserContext) -> Hypothesis:
             symbol = hypothesis.target_candidate.symbol
             if symbol == "ToxicGene":
                 hypothesis.critiques.append(
@@ -214,7 +225,7 @@ async def test_complex_severity_threshold() -> None:
     )
 
     async with engine:
-        results = await engine.run("TargetX")
+        results = await engine.run("TargetX", context=user_context)
 
     # Should accept the 3rd one
     assert len(results) == 1
@@ -227,7 +238,7 @@ async def test_complex_severity_threshold() -> None:
 
 
 @pytest.mark.asyncio
-async def test_multi_gap_mixed_outcomes() -> None:
+async def test_multi_gap_mixed_outcomes(user_context: UserContext) -> None:
     """
     Scenario: The GapScanner returns 3 gaps.
     1. Gap A -> Bridge Found -> Valid -> Accepted.
@@ -238,7 +249,7 @@ async def test_multi_gap_mixed_outcomes() -> None:
     """
 
     class MultiGapScanner(MockGapScanner):
-        async def scan(self, target: str) -> List[KnowledgeGap]:
+        async def scan(self, target: str, context: UserContext) -> List[KnowledgeGap]:
             return [
                 KnowledgeGap(description="Gap A", type=KnowledgeGapType.CLUSTER_DISCONNECT, source_nodes=["A1", "A2"]),
                 KnowledgeGap(description="Gap B", type=KnowledgeGapType.CLUSTER_DISCONNECT, source_nodes=["B1", "B2"]),
@@ -247,7 +258,7 @@ async def test_multi_gap_mixed_outcomes() -> None:
 
     class MultiScenarioBridgeBuilder(MockBridgeBuilder):
         async def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+            self, gap: KnowledgeGap, context: UserContext, excluded_targets: Optional[List[str]] = None
         ) -> BridgeResult:
             if gap.description == "Gap A":
                 # Success case
@@ -293,7 +304,7 @@ async def test_multi_gap_mixed_outcomes() -> None:
             return BridgeResult(hypothesis=None, bridges_found_count=0, considered_candidates=[])
 
     class ContextAwareValidator(MockCausalValidator):
-        async def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+        async def validate(self, hypothesis: Hypothesis, context: UserContext) -> Hypothesis:
             if hypothesis.target_candidate.symbol == "GeneC":
                 hypothesis.causal_validation_score = 0.2
             else:
@@ -312,7 +323,7 @@ async def test_multi_gap_mixed_outcomes() -> None:
     )
 
     async with engine:
-        results = await engine.run("DiseaseX")
+        results = await engine.run("DiseaseX", context=user_context)
 
     # Verify Results (Only 1 accepted)
     assert len(results) == 1
@@ -342,7 +353,7 @@ async def test_multi_gap_mixed_outcomes() -> None:
 
 
 @pytest.mark.asyncio
-async def test_deep_refinement_history_logging() -> None:
+async def test_deep_refinement_history_logging(user_context: UserContext) -> None:
     """
     Scenario:
     1. Candidate 1 (GeneX) -> FATAL Critique.
@@ -357,7 +368,7 @@ async def test_deep_refinement_history_logging() -> None:
 
     class RetryingBridgeBuilder(MockBridgeBuilder):
         async def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+            self, gap: KnowledgeGap, context: UserContext, excluded_targets: Optional[List[str]] = None
         ) -> BridgeResult:
             excluded = excluded_targets or []
             candidates = ["GeneX", "GeneY", "GeneZ"]
@@ -384,7 +395,7 @@ async def test_deep_refinement_history_logging() -> None:
             return BridgeResult(hypothesis=None, bridges_found_count=3, considered_candidates=candidates)
 
     class StrictReviewer(MockAdversarialReviewer):
-        async def review(self, hypothesis: Hypothesis) -> Hypothesis:
+        async def review(self, hypothesis: Hypothesis, context: UserContext) -> Hypothesis:
             sym = hypothesis.target_candidate.symbol
             if sym in ["GeneX", "GeneY"]:
                 hypothesis.critiques.append(
@@ -404,7 +415,7 @@ async def test_deep_refinement_history_logging() -> None:
     )
 
     async with engine:
-        results = await engine.run("DiseaseY")
+        results = await engine.run("DiseaseY", context=user_context)
 
     assert len(results) == 1
     assert results[0].target_candidate.symbol == "GeneZ"

@@ -11,6 +11,7 @@
 from typing import List, Optional
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_episteme.engine import EpistemeEngineAsync
 from coreason_episteme.models import BridgeResult, KnowledgeGap
@@ -36,8 +37,18 @@ def engine() -> EpistemeEngineAsync:
     )
 
 
+@pytest.fixture
+def user_context() -> UserContext:
+    return UserContext(
+        sub="test-user",
+        email="test@coreason.ai",
+        permissions=[],
+        project_context="test",
+    )
+
+
 @pytest.mark.asyncio
-async def test_engine_exception_handling() -> None:
+async def test_engine_exception_handling(user_context: UserContext) -> None:
     """
     Edge Case: A component raises an unhandled exception.
     Result: Engine should catch it, log trace with status=ERROR, and continue to next gap (or exit).
@@ -45,7 +56,7 @@ async def test_engine_exception_handling() -> None:
 
     class CrashingBridgeBuilder(MockBridgeBuilder):
         async def generate_hypothesis(
-            self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+            self, gap: KnowledgeGap, context: UserContext, excluded_targets: Optional[List[str]] = None
         ) -> BridgeResult:
             raise RuntimeError("Critical Failure in Bridge Builder")
 
@@ -61,7 +72,7 @@ async def test_engine_exception_handling() -> None:
 
     # Run engine. It should NOT raise, because we wrapped in try/except.
     async with engine:
-        results = await engine.run("TargetX")
+        results = await engine.run("TargetX", context=user_context)
 
     # Should return empty results (as the gap failed)
     assert len(results) == 0
