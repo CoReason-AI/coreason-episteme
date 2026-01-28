@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import List
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_episteme.components.adversarial_reviewer import AdversarialReviewerImpl
 from coreason_episteme.components.strategies import ReviewStrategy
@@ -67,6 +68,16 @@ class CustomCritiqueStrategy:
 
 
 @pytest.fixture
+def user_context() -> UserContext:
+    return UserContext(
+        sub="test-user",
+        email="test@coreason.ai",
+        permissions=[],
+        project_context="test",
+    )
+
+
+@pytest.fixture
 def sample_hypothesis() -> Hypothesis:
     return Hypothesis(
         id="test-hypo-strategy",
@@ -87,18 +98,18 @@ def sample_hypothesis() -> Hypothesis:
 
 
 @pytest.mark.asyncio
-async def test_reviewer_with_no_strategies(sample_hypothesis: Hypothesis) -> None:
+async def test_reviewer_with_no_strategies(sample_hypothesis: Hypothesis, user_context: UserContext) -> None:
     """
     Edge Case: Reviewer initialized with empty list of strategies.
     Should run without error and produce 0 critiques.
     """
     reviewer = AdversarialReviewerImpl(strategies=[])
-    result = await reviewer.review(sample_hypothesis)
+    result = await reviewer.review(sample_hypothesis, context=user_context)
     assert len(result.critiques) == 0
 
 
 @pytest.mark.asyncio
-async def test_reviewer_with_malfunctioning_strategy(sample_hypothesis: Hypothesis) -> None:
+async def test_reviewer_with_malfunctioning_strategy(sample_hypothesis: Hypothesis, user_context: UserContext) -> None:
     """
     Edge Case: One strategy raises an exception.
     The exception should propagate (Fail Fast).
@@ -111,11 +122,11 @@ async def test_reviewer_with_malfunctioning_strategy(sample_hypothesis: Hypothes
     reviewer = AdversarialReviewerImpl(strategies=strategies)
 
     with pytest.raises(ValueError, match="Boom!"):
-        await reviewer.review(sample_hypothesis)
+        await reviewer.review(sample_hypothesis, context=user_context)
 
 
 @pytest.mark.asyncio
-async def test_reviewer_with_none_returning_strategy(sample_hypothesis: Hypothesis) -> None:
+async def test_reviewer_with_none_returning_strategy(sample_hypothesis: Hypothesis, user_context: UserContext) -> None:
     """
     Edge Case: Strategy violates protocol and returns None.
     Reviewer expects iterable, so this will likely raise TypeError when extending.
@@ -126,11 +137,11 @@ async def test_reviewer_with_none_returning_strategy(sample_hypothesis: Hypothes
     reviewer = AdversarialReviewerImpl(strategies=strategies)
 
     with pytest.raises(TypeError):
-        await reviewer.review(sample_hypothesis)
+        await reviewer.review(sample_hypothesis, context=user_context)
 
 
 @pytest.mark.asyncio
-async def test_reviewer_complex_mix(sample_hypothesis: Hypothesis) -> None:
+async def test_reviewer_complex_mix(sample_hypothesis: Hypothesis, user_context: UserContext) -> None:
     """
     Complex Scenario: Multiple strategies returning mixed critiques.
     Verifies aggregation and order.
@@ -145,7 +156,7 @@ async def test_reviewer_complex_mix(sample_hypothesis: Hypothesis) -> None:
     ]
 
     reviewer = AdversarialReviewerImpl(strategies=strategies)
-    result = await reviewer.review(sample_hypothesis)
+    result = await reviewer.review(sample_hypothesis, context=user_context)
 
     assert len(result.critiques) == 2
     assert result.critiques[0] == critique_fatal

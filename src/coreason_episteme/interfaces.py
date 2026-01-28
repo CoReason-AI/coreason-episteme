@@ -17,6 +17,8 @@ and internal components must adhere to.
 
 from typing import Any, Dict, List, Optional, Protocol
 
+from coreason_identity.models import UserContext
+
 from coreason_episteme.models import BridgeResult, GeneticTarget, Hypothesis, KnowledgeGap
 
 # --- External Service Interfaces ---
@@ -243,12 +245,13 @@ class GapScanner(Protocol):
     Interface for components that identify knowledge gaps.
     """
 
-    async def scan(self, target: str) -> List[KnowledgeGap]:
+    async def scan(self, target: str, context: UserContext) -> List[KnowledgeGap]:
         """
         Scans for knowledge gaps related to the target.
 
         Args:
             target: The disease or biological entity to scan for.
+            context: The user context triggering the scan.
 
         Returns:
             List[KnowledgeGap]: A list of KnowledgeGap objects.
@@ -262,13 +265,14 @@ class BridgeBuilder(Protocol):
     """
 
     async def generate_hypothesis(
-        self, gap: KnowledgeGap, excluded_targets: Optional[List[str]] = None
+        self, gap: KnowledgeGap, context: UserContext, excluded_targets: Optional[List[str]] = None
     ) -> BridgeResult:
         """
         Generates a hypothesis bridging the knowledge gap.
 
         Args:
             gap: The KnowledgeGap to bridge.
+            context: The user context triggering the generation.
             excluded_targets: Optional list of target symbols to exclude from consideration.
 
         Returns:
@@ -282,12 +286,13 @@ class CausalValidator(Protocol):
     Interface for the Causal Validator (The Simulator).
     """
 
-    async def validate(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def validate(self, hypothesis: Hypothesis, context: UserContext) -> Hypothesis:
         """
         Validates the hypothesis using causal simulation.
 
         Args:
             hypothesis: The hypothesis to validate.
+            context: The user context triggering the validation.
 
         Returns:
             Hypothesis: The hypothesis updated with validation scores.
@@ -318,12 +323,13 @@ class AdversarialReviewer(Protocol):
     Interface for the Adversarial Reviewer (The Council).
     """
 
-    async def review(self, hypothesis: Hypothesis) -> Hypothesis:
+    async def review(self, hypothesis: Hypothesis, context: UserContext) -> Hypothesis:
         """
         Conducts an adversarial review of the hypothesis.
 
         Args:
             hypothesis: The hypothesis to review.
+            context: The user context triggering the review.
 
         Returns:
             Hypothesis: The hypothesis updated with critiques from various strategies.

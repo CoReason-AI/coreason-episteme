@@ -11,11 +11,22 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_episteme.components.gap_scanner import GapScannerImpl
 from coreason_episteme.interfaces import GapScanner
 from coreason_episteme.models import KnowledgeGap, KnowledgeGapType
 from tests.mocks import MockGapScanner
+
+
+@pytest.fixture
+def user_context() -> UserContext:
+    return UserContext(
+        sub="test-user",
+        email="test@coreason.ai",
+        permissions=[],
+        project_context="test",
+    )
 
 
 def test_interface_definition() -> None:
@@ -24,10 +35,10 @@ def test_interface_definition() -> None:
 
 
 @pytest.mark.asyncio
-async def test_mock_gap_scanner_scan_found() -> None:
+async def test_mock_gap_scanner_scan_found(user_context: UserContext) -> None:
     """Test that the MockGapScanner returns a gap when one is expected."""
     scanner = MockGapScanner()
-    gaps = await scanner.scan("DiseaseX")
+    gaps = await scanner.scan("DiseaseX", context=user_context)
 
     assert len(gaps) == 1
     assert isinstance(gaps[0], KnowledgeGap)
@@ -37,10 +48,10 @@ async def test_mock_gap_scanner_scan_found() -> None:
 
 
 @pytest.mark.asyncio
-async def test_mock_gap_scanner_scan_not_found() -> None:
+async def test_mock_gap_scanner_scan_not_found(user_context: UserContext) -> None:
     """Test that the MockGapScanner returns an empty list for 'CleanTarget'."""
     scanner = MockGapScanner()
-    gaps = await scanner.scan("CleanTarget")
+    gaps = await scanner.scan("CleanTarget", context=user_context)
 
     assert len(gaps) == 0
 
@@ -82,6 +93,7 @@ async def test_scan_cluster_gap_found(
     mock_graph_client: AsyncMock,
     mock_codex_client: AsyncMock,
     mock_search_client: AsyncMock,
+    user_context: UserContext,
 ) -> None:
     """Test that a gap is created when clusters are found with high similarity."""
     # Setup
@@ -97,7 +109,7 @@ async def test_scan_cluster_gap_found(
     mock_search_client.find_literature_inconsistency.return_value = []
 
     # Execute
-    gaps = await gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX", context=user_context)
 
     # Verify
     assert len(gaps) == 1
@@ -118,6 +130,7 @@ async def test_scan_cluster_gap_filtered_low_similarity(
     mock_graph_client: AsyncMock,
     mock_codex_client: AsyncMock,
     mock_search_client: AsyncMock,
+    user_context: UserContext,
 ) -> None:
     """Test that no gap is created when similarity is low."""
     # Setup
@@ -133,7 +146,7 @@ async def test_scan_cluster_gap_filtered_low_similarity(
     mock_search_client.find_literature_inconsistency.return_value = []
 
     # Execute
-    gaps = await gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX", context=user_context)
 
     # Verify
     assert len(gaps) == 0
@@ -145,6 +158,7 @@ async def test_scan_literature_gap_found(
     mock_graph_client: AsyncMock,
     mock_codex_client: AsyncMock,
     mock_search_client: AsyncMock,
+    user_context: UserContext,
 ) -> None:
     """Test that literature inconsistencies are returned."""
     # Setup
@@ -157,7 +171,7 @@ async def test_scan_literature_gap_found(
     mock_search_client.find_literature_inconsistency.return_value = [lit_gap]
 
     # Execute
-    gaps = await gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX", context=user_context)
 
     # Verify
     assert len(gaps) == 1
@@ -171,6 +185,7 @@ async def test_scan_combined_results(
     mock_graph_client: AsyncMock,
     mock_codex_client: AsyncMock,
     mock_search_client: AsyncMock,
+    user_context: UserContext,
 ) -> None:
     """Test that results from both sources are combined."""
     # Setup
@@ -184,7 +199,7 @@ async def test_scan_combined_results(
     mock_search_client.find_literature_inconsistency.return_value = [lit_gap]
 
     # Execute
-    gaps = await gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX", context=user_context)
 
     # Verify
     assert len(gaps) == 2
@@ -198,6 +213,7 @@ async def test_scan_malformed_cluster_data(
     gap_scanner_impl: GapScannerImpl,
     mock_graph_client: AsyncMock,
     mock_codex_client: AsyncMock,
+    user_context: UserContext,
 ) -> None:
     """Test handling of clusters missing IDs."""
     # Setup
@@ -206,7 +222,7 @@ async def test_scan_malformed_cluster_data(
     ]
 
     # Execute
-    gaps = await gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX", context=user_context)
 
     # Verify
     assert len(gaps) == 0
@@ -219,13 +235,14 @@ async def test_scan_boundary_condition(
     mock_graph_client: AsyncMock,
     mock_codex_client: AsyncMock,
     mock_search_client: AsyncMock,
+    user_context: UserContext,
 ) -> None:
     """Test boundary condition where similarity is exactly 0.75."""
     mock_graph_client.find_disconnected_clusters.return_value = [{"cluster_a_id": "A", "cluster_b_id": "B"}]
     mock_codex_client.get_semantic_similarity.return_value = 0.75
     mock_search_client.find_literature_inconsistency.return_value = []
 
-    gaps = await gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX", context=user_context)
 
     assert len(gaps) == 1
     assert gaps[0].type == KnowledgeGapType.CLUSTER_DISCONNECT
@@ -237,6 +254,7 @@ async def test_scan_robustness_malformed_data(
     mock_graph_client: AsyncMock,
     mock_codex_client: AsyncMock,
     mock_search_client: AsyncMock,
+    user_context: UserContext,
 ) -> None:
     """Test robustness against malformed data (None, empty strings)."""
     mock_graph_client.find_disconnected_clusters.return_value = [
@@ -247,7 +265,7 @@ async def test_scan_robustness_malformed_data(
     ]
     mock_search_client.find_literature_inconsistency.return_value = []
 
-    gaps = await gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX", context=user_context)
 
     assert len(gaps) == 0
     mock_codex_client.get_semantic_similarity.assert_not_called()
@@ -259,6 +277,7 @@ async def test_scan_complex_scenario(
     mock_graph_client: AsyncMock,
     mock_codex_client: AsyncMock,
     mock_search_client: AsyncMock,
+    user_context: UserContext,
 ) -> None:
     """Test a complex scenario with mixed valid/invalid clusters and search results."""
     mock_graph_client.find_disconnected_clusters.return_value = [
@@ -280,7 +299,7 @@ async def test_scan_complex_scenario(
         KnowledgeGap(description="Lit Gap", type=KnowledgeGapType.LITERATURE_INCONSISTENCY, source_nodes=["PMID:1"])
     ]
 
-    gaps = await gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX", context=user_context)
 
     assert len(gaps) == 2
     assert any(g.type == KnowledgeGapType.CLUSTER_DISCONNECT for g in gaps)
@@ -293,6 +312,7 @@ async def test_scan_duplicate_symmetry(
     mock_graph_client: AsyncMock,
     mock_codex_client: AsyncMock,
     mock_search_client: AsyncMock,
+    user_context: UserContext,
 ) -> None:
     """
     Test behavior when symmetric pairs (A-B and B-A) are returned.
@@ -305,7 +325,7 @@ async def test_scan_duplicate_symmetry(
     mock_codex_client.get_semantic_similarity.return_value = 0.9
     mock_search_client.find_literature_inconsistency.return_value = []
 
-    gaps = await gap_scanner_impl.scan("TargetX")
+    gaps = await gap_scanner_impl.scan("TargetX", context=user_context)
 
     assert len(gaps) == 2
     assert gaps[0].source_nodes == ["A", "B"]
