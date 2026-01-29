@@ -28,6 +28,12 @@ Crucially, it implements a **"Null Hypothesis First"** architecture. Every gener
 pip install coreason-episteme
 ```
 
+For microservice support, ensure you have the server dependencies installed (included by default in the package):
+
+```bash
+poetry install
+```
+
 ## Features
 
 *   **Gap Scanner:** Detects inconsistencies or missing links in the Knowledge Graph and literature.
@@ -93,6 +99,29 @@ try:
 except Exception as e:
     print(f"Error generating hypotheses: {e}")
 ```
+
+## Microservice Mode (Theorist Service)
+
+You can run `coreason-episteme` as a standalone microservice using the built-in FastAPI server.
+
+### Running via Docker
+
+```bash
+docker build -t coreason-episteme .
+docker run -p 8000:8000 coreason-episteme
+```
+
+### API Usage
+
+**Generate Hypothesis:**
+
+```bash
+curl -X POST http://localhost:8000/generate \
+  -H "Content-Type: application/json" \
+  -d '{"disease_id": "DOID:12345", "user_id": "api-user"}'
+```
+
+See [Usage Guide](docs/usage.md) for more details.
 
 ## License
 
