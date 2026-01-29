@@ -84,13 +84,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await http_client.aclose()
 
 
-app = FastAPI(lifespan=lifespan, title="CoReason Episteme (Theorist)", version="0.2.1")
+app = FastAPI(lifespan=lifespan, title="CoReason Episteme (Theorist)", version="0.3.0")
 
 
 @app.get("/health")
 async def health() -> Dict[str, str]:
     """Health check endpoint."""
-    return {"status": "ok", "version": "0.2.1"}
+    return {"status": "ok", "version": "0.3.0"}
 
 
 @app.post("/generate", response_model=List[Hypothesis])
