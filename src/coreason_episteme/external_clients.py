@@ -12,7 +12,7 @@
 HTTP implementations of external service clients.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import httpx
 
@@ -29,7 +29,7 @@ class HttpGraphNexusClient:
     async def find_disconnected_clusters(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
         response = await self.client.post(f"{self.base_url}/find_disconnected_clusters", json=criteria)
         response.raise_for_status()
-        return response.json()
+        return cast(List[Dict[str, Any]], response.json())
 
     async def find_latent_bridges(self, source_cluster_id: str, target_cluster_id: str) -> List[GeneticTarget]:
         payload = {

@@ -13,7 +13,7 @@ FastAPI Server for coreason-episteme (Theorist Service).
 """
 
 from contextlib import asynccontextmanager
-from typing import List, Optional
+from typing import AsyncGenerator, Dict, List, Optional
 
 import httpx
 from coreason_identity.models import UserContext
@@ -43,7 +43,7 @@ class HypothesisRequest(BaseModel):
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Lifespan context manager for the FastAPI application.
     Initializes external clients and the Episteme engine.
@@ -88,13 +88,13 @@ app = FastAPI(lifespan=lifespan, title="CoReason Episteme (Theorist)", version="
 
 
 @app.get("/health")
-async def health():
+async def health() -> Dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "version": "0.2.1"}
 
 
 @app.post("/generate", response_model=List[Hypothesis])
-async def generate_hypothesis_endpoint(request: HypothesisRequest):
+async def generate_hypothesis_endpoint(request: HypothesisRequest) -> List[Hypothesis]:
     """
     Generate hypotheses for a given disease.
     """

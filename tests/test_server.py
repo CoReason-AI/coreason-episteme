@@ -8,24 +8,23 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_episteme
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from unittest.mock import patch
+from coreason_episteme.main import EpistemeAsync
+from coreason_episteme.models import PICO, ConfidenceLevel, GeneticTarget, Hypothesis
+from coreason_episteme.server import app
 
-from coreason_episteme.models import ConfidenceLevel, GeneticTarget, Hypothesis, PICO
-from coreason_episteme.server import EpistemeAsync, app
 
-
-def test_health():
+def test_health() -> None:
     with TestClient(app) as client:
         response = client.get("/health")
         assert response.status_code == 200
         assert response.json() == {"status": "ok", "version": "0.2.1"}
 
 
-def test_generate_hypothesis():
+def test_generate_hypothesis() -> None:
     mock_engine = MagicMock(spec=EpistemeAsync)
     mock_engine.run = AsyncMock()
     # We also need access to the inner engine if overriding retries
@@ -68,7 +67,7 @@ def test_generate_hypothesis():
         assert kwargs["context"].user_id == "api-user"
 
 
-def test_generate_hypothesis_with_retries():
+def test_generate_hypothesis_with_retries() -> None:
     mock_engine = MagicMock(spec=EpistemeAsync)
     # mock_engine.run is not called on the base engine if retries are set,
     # because we create a new engine and run that.
