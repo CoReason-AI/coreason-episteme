@@ -55,7 +55,7 @@ class AdversarialReviewerImpl:
         """
         logger.info(
             f"Convening Review Board for hypothesis: {hypothesis.id}",
-            user_id=context.sub,
+            user_id=context.user_id,
         )
 
         critiques: list[Critique] = []

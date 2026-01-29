@@ -69,7 +69,7 @@ def test_generate_hypothesis_sync_facade(mock_clients: Dict[str, Any]) -> None:
         args, kwargs = mock_instance.run.call_args
         assert args == ("disease_123",)
         assert "context" in kwargs
-        assert kwargs["context"].sub == "cli-user"
+        assert kwargs["context"].user_id == "cli-user"
 
 
 def test_generate_hypothesis_missing_deps() -> None:
