@@ -31,5 +31,13 @@ class Settings(BaseSettings):
     GAP_SCANNER_SIMILARITY_THRESHOLD: float = 0.75
     DRUGGABILITY_THRESHOLD: float = 0.5
 
+    # External Services
+    GRAPH_NEXUS_URL: str = "http://coreason-graph-nexus:8000"
+    CODEX_URL: str = "http://coreason-codex:8000"
+    SEARCH_URL: str = "http://coreason-search:8000"
+    PRISM_URL: str = "http://coreason-prism:8000"
+    INFERENCE_URL: str = "http://coreason-inference:8000"
+    VERITAS_URL: str = "http://coreason-veritas:8000"
+
 
 settings = Settings()
