@@ -48,6 +48,7 @@ class TestIntegrationConfigOverrides:
     @pytest.fixture
     def user_context(self) -> UserContext:
         return UserContext(
+            user_id="test-user",
             sub="test-user",
             email="test@coreason.ai",
             permissions=[],

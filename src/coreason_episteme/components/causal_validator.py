@@ -55,7 +55,7 @@ class CausalValidatorImpl:
         """
         logger.info(
             f"Validating hypothesis: {hypothesis.id}",
-            user_id=context.sub,
+            user_id=context.user_id,
         )
 
         mechanism = hypothesis.proposed_mechanism

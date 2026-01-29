@@ -30,6 +30,7 @@ def mock_inference_client() -> AsyncMock:
 @pytest.fixture
 def user_context() -> UserContext:
     return UserContext(
+        user_id="test-user",
         sub="test-user",
         email="test@coreason.ai",
         permissions=[],

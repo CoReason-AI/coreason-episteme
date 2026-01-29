@@ -84,7 +84,7 @@ class BridgeBuilderImpl:
         """
         logger.info(
             f"Attempting to build bridge for gap: {gap.description}",
-            user_id=context.sub,
+            user_id=context.user_id,
         )
         if excluded_targets:
             logger.info(f"Excluding targets: {excluded_targets}")
