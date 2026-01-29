@@ -215,6 +215,7 @@ def generate_hypothesis(
 
     if context is None:
         context = UserContext(
+            user_id="cli-user",
             sub="cli-user",
             email="cli@coreason.ai",
             permissions=["system"],

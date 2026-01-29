@@ -65,7 +65,7 @@ class GapScannerImpl:
         """
         logger.info(
             f"Scanning for knowledge gaps related to {target}...",
-            user_id=context.sub,
+            user_id=context.user_id,
         )
         gaps: List[KnowledgeGap] = []
 

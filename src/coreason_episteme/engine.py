@@ -100,7 +100,7 @@ class EpistemeEngineAsync:
 
         logger.info(
             f"Starting Episteme Engine for: {disease_id}",
-            user_id=context.sub,
+            user_id=context.user_id,
             protocol_title=disease_id,
         )
         results: List[Hypothesis] = []
